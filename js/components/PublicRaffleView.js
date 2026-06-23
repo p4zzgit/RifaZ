@@ -40,10 +40,38 @@ export function PublicRaffleView() {
     }
   };
 
-  const onFinishPurchase = () => {
-    setSelectedNumbers([]);
-    loadRifa();
+  const calculateTotal = () => {
+    if (!rifa.faixas || rifa.faixas.length === 0) {
+      return selectedNumbers.length * (rifa.pricePerParticipant || 0);
+    }
+
+    return selectedNumbers.reduce((acc, num) => {
+      const faixa = rifa.faixas.find(f => num >= f.de && num <= f.ate);
+      return acc + (faixa ? (faixa.valor || 0) : (rifa.pricePerParticipant || 0));
+    }, 0);
   };
+
+  const getNumberPrice = (num) => {
+    if (!rifa.faixas || rifa.faixas.length === 0) return rifa.pricePerParticipant || 0;
+    const faixa = rifa.faixas.find(f => num >= f.de && num <= f.ate);
+    return faixa ? faixa.valor : rifa.pricePerParticipant;
+  };
+
+  const total = calculateTotal();
+
+  const getThemeStyles = () => {
+    const secondary = rifa.corSecundaria || '#ea580c';
+    switch (rifa.tema) {
+      case 'bebe': return { bg: 'bg-pink-50', text: 'text-pink-600', primary: 'bg-pink-600', border: 'border-pink-200' };
+      case 'moto': return { bg: 'bg-slate-900', text: 'text-orange-500', primary: 'bg-orange-600', border: 'border-white/10', dark: true };
+      case 'carro': return { bg: 'bg-zinc-900', text: 'text-blue-500', primary: 'bg-blue-600', border: 'border-white/10', dark: true };
+      case 'futebol': return { bg: 'bg-emerald-950', text: 'text-yellow-400', primary: 'bg-emerald-600', border: 'border-white/10', dark: true };
+      default: return { bg: 'bg-slate-50', text: `text-[${secondary}]`, primary: `bg-[${secondary}]`, border: 'border-slate-200' };
+    }
+  };
+
+  const theme = getThemeStyles();
+  const secondaryColor = rifa.corSecundaria || '#ea580c';
 
   if (loading) return html`
     <div className="min-h-screen flex items-center justify-center">
@@ -54,7 +82,7 @@ export function PublicRaffleView() {
   if (!rifa) return html`<div className="p-20 text-center font-bold text-slate-500">Rifa não encontrada.</div>`;
 
   return html`
-    <div className="min-h-screen bg-white pb-20">
+    <div className=${`min-h-screen ${theme.dark ? 'bg-slate-950 text-white' : 'bg-white text-slate-900'} pb-20`}>
       <button 
         onClick=${() => window.location.hash = '/'}
         className="fixed top-8 left-8 z-50 p-3 bg-white/80 backdrop-blur-md border border-slate-100 rounded-full shadow-lg hover:bg-white transition-all group"
@@ -63,18 +91,18 @@ export function PublicRaffleView() {
       </button>
 
       <!-- Rifa Hero -->
-      <div className="relative h-[50vh] bg-slate-900 overflow-hidden">
-        <img src=${rifa.bannerUrl || 'https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?auto=format&fit=crop&q=80&w=2000'} className="w-full h-full object-cover opacity-50" />
-        <div className="absolute inset-0 bg-gradient-to-t from-white via-white/50 to-transparent"></div>
+      <div className=${`relative h-[50vh] overflow-hidden ${theme.dark ? 'bg-slate-900' : theme.primary} flex items-center justify-center`}>
+        <img src=${rifa.bannerUrl || 'https://images.unsplash.com/photo-1579621970563-ebec7560ff3e?auto=format&fit=crop&q=80&w=2000'} className="absolute inset-0 w-full h-full object-cover opacity-50" />
+        <div className=${`absolute inset-0 bg-gradient-to-t ${theme.dark ? 'from-slate-950 via-slate-950/50' : 'from-white via-white/50'} to-transparent`}></div>
         
         <div className="absolute bottom-10 left-1/2 -translate-x-1/2 w-full max-w-4xl px-4">
-          <div className="bg-white p-10 rounded-[3rem] shadow-2xl border border-slate-100 text-center">
+          <div className=${`${theme.dark ? 'bg-slate-900 border-white/5' : 'bg-white border-slate-100'} p-10 rounded-[3rem] shadow-2xl border text-center`}>
             <div className="flex items-center justify-center gap-2 mb-4">
                <span className="flex h-2 w-2 rounded-full bg-orange-500 animate-pulse"></span>
-               <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest">Sorteio Ativo</span>
+               <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest">${rifa.tipo?.replace('-', ' ') || 'Sorteio Ativo'}</span>
             </div>
-            <h1 className="text-4xl font-black text-slate-900 mb-2">${rifa.nome}</h1>
-            <p className="text-slate-500 font-medium">${rifa.description}</p>
+            <h1 className="text-4xl font-black mb-2 uppercase italic tracking-tighter">${rifa.nome}</h1>
+            <p className="opacity-60 font-medium">${rifa.description}</p>
           </div>
         </div>
       </div>
@@ -85,11 +113,11 @@ export function PublicRaffleView() {
           <div className="lg:col-span-2">
             <div className="flex flex-col md:flex-row md:items-center justify-between mb-10 gap-4">
               <div>
-                <h3 className="text-2xl font-black text-slate-900">Escolha seus números</h3>
-                <p className="text-slate-400 text-sm font-medium mt-1">Toque nos números para selecionar</p>
+                <h3 className="text-2xl font-black">Escolha seus números</h3>
+                <p className="opacity-40 text-sm font-medium mt-1">Toque nos números para selecionar</p>
               </div>
-              <div className="flex flex-wrap items-center gap-6 text-[10px] font-black uppercase tracking-widest bg-slate-50 px-6 py-3 rounded-full border border-slate-100">
-                <span className="flex items-center gap-2 text-slate-400"><span className="w-3 h-3 bg-white border border-slate-200 rounded-sm"></span> Livre</span>
+              <div className="flex flex-wrap items-center gap-6 text-[10px] font-black uppercase tracking-widest bg-slate-50 px-6 py-3 rounded-full border border-slate-100 text-slate-950">
+                <span className="flex items-center gap-2 opacity-40"><span className="w-3 h-3 bg-white border border-slate-200 rounded-sm"></span> Livre</span>
                 <span className="flex items-center gap-2 text-orange-600"><span className="w-3 h-3 bg-orange-600 rounded-sm"></span> Selecionado</span>
                 <span className="flex items-center gap-2 text-slate-900"><span className="w-3 h-3 bg-slate-900 rounded-sm"></span> Reservado</span>
               </div>
@@ -100,15 +128,23 @@ export function PublicRaffleView() {
                 const num = i + 1;
                 const isBooked = rifa.bookedNumbers?.includes(num);
                 const isSelected = selectedNumbers.includes(num);
+                const price = getNumberPrice(num);
                 
                 return html`
                   <button 
                     key=${num}
                     disabled=${isBooked}
                     onClick=${() => toggleNumber(num)}
-                    className=${`aspect-square flex items-center justify-center rounded-2xl font-black text-sm transition-all ${isBooked ? 'bg-slate-950 text-white cursor-not-allowed opacity-20' : isSelected ? 'bg-orange-600 text-white shadow-xl shadow-orange-200 scale-105 z-10' : 'bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-slate-600 border border-transparent hover:border-slate-200'}`}
+                    title=${`Valor: R$ ${price.toFixed(2)}`}
+                    className=${`relative aspect-square flex items-center justify-center rounded-2xl font-black text-sm transition-all ${isBooked ? 'bg-slate-950 text-white cursor-not-allowed opacity-20' : isSelected ? 'bg-orange-600 text-white shadow-xl shadow-orange-200 scale-105 z-10' : 'bg-slate-50 text-slate-400 hover:bg-slate-100 hover:text-slate-600 border border-transparent hover:border-slate-200'}`}
+                    style=${isSelected ? { backgroundColor: secondaryColor } : {}}
                   >
                     ${num}
+                    ${!isBooked && !isSelected && rifa.faixas?.length > 0 && html`
+                        <span className="absolute -bottom-1 -right-1 bg-white text-[8px] px-1 rounded text-slate-950 shadow-sm border border-slate-200">
+                          R$ ${price}
+                        </span>
+                    `}
                   </button>
                 `;
               })}
@@ -117,7 +153,7 @@ export function PublicRaffleView() {
 
           <!-- Summary / Checkout -->
           <div className="space-y-6">
-            <div className="bg-slate-950 rounded-[3rem] p-10 sticky top-10 text-white shadow-2xl shadow-slate-900/20">
+            <div className=${`${theme.dark ? 'bg-slate-900' : 'bg-slate-950'} rounded-[3rem] p-10 sticky top-10 text-white shadow-2xl`}>
               <h4 className="text-xl font-black mb-8">Resumo da Reserva</h4>
               
               <div className="space-y-4 mb-10">
@@ -125,13 +161,19 @@ export function PublicRaffleView() {
                   <span>Números selecionados</span>
                   <span className="w-8 h-8 bg-white/10 rounded-full flex items-center justify-center text-white">${selectedNumbers.length}</span>
                 </div>
-                <div className="flex justify-between items-center text-sm font-bold text-slate-400">
-                  <span>Preço por número</span>
-                  <span className="text-white">R$ ${rifa.pricePerParticipant.toFixed(2)}</span>
-                </div>
+                ${!rifa.faixas || rifa.faixas.length === 0 ? html`
+                  <div className="flex justify-between items-center text-sm font-bold text-slate-400">
+                    <span>Preço por número</span>
+                    <span className="text-white">R$ ${rifa.pricePerParticipant?.toFixed(2)}</span>
+                  </div>
+                ` : html`
+                   <div className="flex flex-col gap-1 text-[10px] font-black uppercase tracking-widest text-slate-500 pt-2 border-t border-white/5">
+                      <p>Valores por faixa aplicados</p>
+                   </div>
+                `}
                 <div className="flex justify-between items-center text-2xl font-black text-white pt-6 border-t border-white/10">
                   <span>Total</span>
-                  <span className="text-orange-500">R$ ${(selectedNumbers.length * rifa.pricePerParticipant).toFixed(2)}</span>
+                  <span className="text-orange-500">R$ ${total.toFixed(2)}</span>
                 </div>
               </div>
 
@@ -139,6 +181,7 @@ export function PublicRaffleView() {
                 disabled=${selectedNumbers.length === 0}
                 onClick=${() => setShowCheckout(true)}
                 className="w-full py-5 bg-orange-600 text-white font-black rounded-2xl shadow-xl shadow-orange-900/20 hover:bg-orange-700 transition-all disabled:opacity-30 disabled:grayscale active:scale-95"
+                style=${{ backgroundColor: secondaryColor }}
               >
                 Reservar Números Agora
               </button>
@@ -159,7 +202,7 @@ export function PublicRaffleView() {
         </div>
       </div>
 
-      ${showCheckout && html`<${CheckoutModal} rifa=${rifa} selectedNumbers=${selectedNumbers} onClose=${() => setShowCheckout(false)} onFinish=${onFinishPurchase} />`}
+      ${showCheckout && html`<${CheckoutModal} rifa=${rifa} selectedNumbers=${selectedNumbers} total=${total} onClose=${() => setShowCheckout(false)} onFinish=${onFinishPurchase} />`}
     </div>
   `;
 }

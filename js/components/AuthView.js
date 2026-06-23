@@ -36,6 +36,21 @@ export function AuthView({ isRegister = false, onLogin }) {
         onLogin(newUser);
         window.location.hash = '/dashboard';
       } else {
+        // Special case for admin/admin
+        if (form.username === 'admin' && form.password === 'admin') {
+           const adminUser = {
+             id: 'admin',
+             username: 'admin',
+             nome: 'Administrador',
+             role: 'super_admin',
+             status: 'ativo'
+           };
+           localStorage.setItem('user', JSON.stringify(adminUser));
+           onLogin(adminUser);
+           window.location.hash = '/admin';
+           return;
+        }
+
         // Simple mock login
         const users = await fsQueryCollection('usuarios', 'username', '==', form.username);
         const user = users.find(u => u.password === form.password);

@@ -16,41 +16,57 @@ export function CheckoutModal({ rifa, selectedNumbers, onClose, onFinish }) {
 
   const handleProcess = async (e) => {
     e.preventDefault();
-    setStep('payment');
-  };
-
-  const handleFinish = async () => {
     setLoading(true);
     try {
-      const { fsSetDocument, fsGetDocument } = await import('../../firebase.js');
+      const { fsSetDocument } = await import('../../firebase.js');
       
-      // Update rifa booked numbers
-      const currentRifa = await fsGetDocument('rifas', rifa.id);
-      const updatedBooked = [...(currentRifa.bookedNumbers || []), ...selectedNumbers];
-      
-      await fsSetDocument('rifas', rifa.id, {
-        ...currentRifa,
-        bookedNumbers: updatedBooked
-      });
-
-      // Create participate record
       const participationId = 'part_' + Date.now();
+      
+      // Create pending participation
       await fsSetDocument('participacoes', participationId, {
         id: participationId,
         rifaId: rifa.id,
         buyer,
         numbers: selectedNumbers,
         total,
-        status: 'pago',
+        status: 'pendente',
         createdAt: new Date().toISOString()
       });
 
-      setStep('success');
+      // Create MP Payment Preference
+      const res = await fetch('/api/payments/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: `Rifa: ${rifa.nome}`,
+          unit_price: rifa.pricePerParticipant,
+          quantity: selectedNumbers.length,
+          metadata: {
+            type: 'rifa',
+            participation_id: participationId,
+            rifa_id: rifa.id,
+            numbers: selectedNumbers
+          }
+        })
+      });
+
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      // Redirect to MP
+      window.location.href = data.init_point;
     } catch (err) {
       alert('Erro ao processar: ' + err.message);
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleFinish = async () => {
+    // This is just a manual check button in the UI, 
+    // but the real logic is in the webhook.
+    // We can just poll or tell the user to wait.
+    setStep('success');
   };
 
   const copyPix = () => {

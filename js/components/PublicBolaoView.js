@@ -4,11 +4,14 @@ import { useState, useEffect } from 'https://esm.sh/preact/hooks';
 import htm from 'https://esm.sh/htm';
 import { ArrowLeft, Trophy, Calendar, Users, ShieldCheck } from 'https://esm.sh/lucide-preact';
 
+import { ParticipateBolaoModal } from './modals/ParticipateBolaoModal.js';
+
 const html = htm.bind(h);
 
 export function PublicBolaoView() {
   const [bolao, setBolao] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
   
   const slug = window.location.hash.split('/').pop();
 
@@ -104,7 +107,7 @@ export function PublicBolaoView() {
                    </div>
                 </div>
 
-                <button className="w-full py-5 bg-white text-blue-600 font-black rounded-2xl shadow-xl hover:bg-blue-50 transition-all active:scale-95 text-lg">
+                <button onClick=${() => setShowModal(true)} className="w-full py-5 bg-white text-blue-600 font-black rounded-2xl shadow-xl hover:bg-blue-50 transition-all active:scale-95 text-lg">
                   Quero Participar
                 </button>
 
@@ -126,6 +129,7 @@ export function PublicBolaoView() {
            </div>
         </div>
       </div>
+      ${showModal && html`<${ParticipateBolaoModal} bolao=${bolao} onClose=${() => setShowModal(false)} />`}
     </div>
   `;
 }
