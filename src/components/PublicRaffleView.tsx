@@ -49,7 +49,7 @@ export default function PublicRaffleView() {
     const load = async () => {
         try {
             const res = await fetch(`/api/raffles/view/${slug}`);
-            if (!res.ok) throw new Error('Rifa não encontrada');
+            if (!res.ok) throw new Error('API unavailable');
             const data = await res.json();
             setRifa(data);
             if (data.bookedNumbers) {
@@ -57,6 +57,20 @@ export default function PublicRaffleView() {
             }
             setLoading(false);
         } catch (e) {
+            console.log('API raffle view unavailable, falling back to Firebase');
+            const { fsQueryCollection, isFirebaseEnabled } = await import('../firebase');
+            if (isFirebaseEnabled()) {
+              const raffles = await fsQueryCollection('rifas', 'slug', '==', slug);
+              if (raffles.length > 0) {
+                const data = raffles[0];
+                setRifa(data);
+                if (data.bookedNumbers) {
+                  setBookedNumbers(data.bookedNumbers);
+                }
+                setLoading(false);
+                return;
+              }
+            }
             setLoading(false);
         }
     };
@@ -134,17 +148,43 @@ export default function PublicRaffleView() {
           total: calculateTotal()
         })
       });
-      if (!res.ok) {
-        const error = await res.json();
-        alert(error.error || 'Erro ao processar compra');
+      
+      if (res.ok) {
+        const data = await res.json();
+        setPendingPurchase(data);
+        setPurchaseStep('payment');
         return;
       }
-      const data = await res.json();
-      setPendingPurchase(data);
-      setPurchaseStep('payment');
-    } catch (error) {
+
+      // Fallback for GH Pages
+      console.log('API purchase unavailable, falling back to Firebase');
+      const { fsSetDocument, isFirebaseEnabled } = await import('../firebase');
+      if (isFirebaseEnabled()) {
+        const purchaseId = 'p_' + Math.random().toString(36).substr(2, 9);
+        const purchaseData = {
+          id: purchaseId,
+          ...form,
+          rifaSlug: slug,
+          numbers: selectedNumbers,
+          total: calculateTotal(),
+          status: 'pendente',
+          createdAt: new Date().toISOString(),
+          pixCopiaECola: '00020126330014BR.GOV.BCB.PIX0111' + (form.whatsapp || 'suporte') + '520400005303986540' + calculateTotal().toFixed(2) + '5802BR5908FAZENDA6009SAO PAULO62070503***6304',
+          pixQrCode: '' // In static mode we might not have a QR generator easily
+        };
+        
+        const success = await fsSetDocument('compras', purchaseId, purchaseData);
+        if (success) {
+          setPendingPurchase(purchaseData as any);
+          setPurchaseStep('payment');
+          return;
+        }
+      }
+      
+      throw new Error('Serviço de pagamento indisponível no momento.');
+    } catch (error: any) {
       console.error('Purchase error:', error);
-      alert('Ocorreu um erro ao gerar o pagamento.');
+      alert(error.message || 'Ocorreu um erro ao gerar o pagamento.');
     }
   };
 

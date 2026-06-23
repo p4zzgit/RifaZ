@@ -46,14 +46,37 @@ export default function LandingPage({ onLoginClick, user }: LandingPageProps) {
 
     fetch('/api/config')
       .then(async res => {
-        if (!res.ok) return null;
+        if (!res.ok) throw new Error('API unavailable');
         const text = await res.text();
         return text ? JSON.parse(text) : null;
       })
       .then(data => {
         if (data) setConfig(data);
       })
-      .catch(err => console.error('Config fetch error:', err));
+      .catch(async () => {
+        console.log('API config unavailable, falling back to Firebase/Local');
+        const { fsGetGlobalConfig, isFirebaseEnabled } = await import('../firebase');
+        if (isFirebaseEnabled()) {
+          const fbConfig = await fsGetGlobalConfig();
+          if (fbConfig) {
+            setConfig(fbConfig);
+            return;
+          }
+        }
+        
+        // Final fallback to some hardcoded values if everything fails
+        setConfig({
+          platformName: 'Rifa Digital',
+          platformLogo: '',
+          primaryColor: '#FFFFFF',
+          secondaryColor: '#FF8C00',
+          contactEmail: 'suporte@rifadigital.com',
+          contactWhatsApp: '',
+          faqs: [],
+          testimonials: [],
+          footerText: '© 2026 Rifa Digital. Todos os direitos reservados.'
+        } as any);
+      });
   }, []);
 
   if (!config) return <div className="h-screen flex items-center justify-center font-black text-[#FF8C00] animate-pulse">Carregando Plataforma...</div>;

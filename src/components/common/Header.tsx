@@ -35,7 +35,7 @@ export const Header: React.FC<HeaderProps> = ({ config, user, onLoginClick, onCr
           {user?.role === 'super_admin' ? (
              <button
                id="header-admin-panel"
-               onClick={() => window.location.href = '/admin'}
+               onClick={() => window.location.hash = '#/admin'}
                className="text-xs font-black bg-gray-900 text-white px-3 sm:px-4 py-2 rounded-xl transition-all hover-bg-primary-custom flex items-center gap-2 shrink-0"
              >
                <Lock className="w-3.5 h-3.5" />
@@ -45,7 +45,7 @@ export const Header: React.FC<HeaderProps> = ({ config, user, onLoginClick, onCr
           ) : user ? (
             <button
                id="header-user-panel"
-               onClick={() => window.location.href = '/panel'}
+               onClick={() => window.location.hash = '#/panel'}
                className="text-xs font-black bg-gray-50 text-gray-900 px-3 sm:px-4 py-2 rounded-xl border border-gray-100 hover:border-primary-custom transition-all shrink-0"
              >
                Meu Painel

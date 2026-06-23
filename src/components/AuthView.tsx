@@ -44,11 +44,30 @@ export default function AuthView({ onLoginSuccess }: AuthViewProps) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form)
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Erro no login');
       
-      localStorage.setItem('token', data.token);
-      onLoginSuccess(data.token, data.user);
+      if (res.ok) {
+        const data = await res.json();
+        localStorage.setItem('token', data.token);
+        onLoginSuccess(data.token, data.user);
+        return;
+      }
+      
+      // Fallback for static (GH Pages)
+      console.log('API login unavailable or failed, checking Firebase for user...');
+      const { fsQueryCollection, isFirebaseEnabled } = await import('../firebase');
+      
+      if (isFirebaseEnabled()) {
+        const users = await fsQueryCollection('usuarios', 'username', '==', form.username);
+        const user = users[0];
+        
+        if (user && user.password === form.password) { // ⚠️ Insecure: just for static proof-of-concept
+          localStorage.setItem('token', 'static-session-token');
+          onLoginSuccess('static-session-token', user);
+          return;
+        }
+      }
+      
+      throw new Error('Credenciais inválidas ou serviço indisponível');
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -146,7 +165,7 @@ export default function AuthView({ onLoginSuccess }: AuthViewProps) {
 
                 <button 
                   type="button"
-                  onClick={() => window.location.href = '/?create=true'}
+                  onClick={() => window.location.hash = '#/?create=true'}
                   className="w-full bg-[#FFF5EB] hover:bg-[#FFEADA] text-[#FF8C00] font-black py-4 rounded-2xl transition-all flex items-center justify-center gap-2 text-sm border border-orange-100 cursor-pointer"
                 >
                   Crie sua Rifa
@@ -156,7 +175,7 @@ export default function AuthView({ onLoginSuccess }: AuthViewProps) {
 
            <div className="text-center pt-2">
               <button 
-                onClick={() => window.location.href = '/'}
+                onClick={() => window.location.hash = '#/'}
                 className="text-[10px] font-black text-gray-400 uppercase tracking-widest hover:text-[#FF8C00] transition-colors flex items-center justify-center gap-2 mx-auto cursor-pointer"
               >
                 <ArrowLeft className="w-3 h-3" />

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import LandingPage from './components/LandingPage';
 import PublicRaffleView from './components/PublicRaffleView';
 import PublicBolaoView from './components/PublicBolaoView';
@@ -16,11 +16,11 @@ export default function App() {
     setToken(newToken);
     setUser(newUser);
     
-    // Redirect based on role
+    // Redirect based on role using hash for GitHub Pages compatibility
     if (newUser.role === 'super_admin') {
-      window.location.href = '/admin';
+      window.location.hash = '#/admin';
     } else {
-      window.location.href = '/panel';
+      window.location.hash = '#/panel';
     }
   };
 
@@ -28,7 +28,7 @@ export default function App() {
     <Router>
       <Routes>
         {/* Landing Page */}
-        <Route path="/" element={<LandingPage user={user} onLoginClick={() => window.location.href = '/login'} />} />
+        <Route path="/" element={<LandingPage user={user} onLoginClick={() => window.location.hash = '#/login'} />} />
         
         {/* Auth */}
         <Route path="/login" element={<AuthView onLoginSuccess={handleLoginSuccess} />} />

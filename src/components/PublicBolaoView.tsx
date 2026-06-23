@@ -74,14 +74,29 @@ export default function PublicBolaoView() {
             setIsBlocked(true);
             throw new Error(data.error);
           }
-          throw new Error(data.error || 'Erro ao carregar detalhes do bolão.');
+          throw new Error(data.error || 'API unavailable');
         }
         setBolao(data.bolao);
         setMatches(data.matches || []);
         setRankings(data.rankings || []);
         setParticipantsCount(data.participantsCount || 0);
       })
-      .catch(err => {
+      .catch(async err => {
+        console.log('API bolao view unavailable, falling back to Firebase');
+        const { fsQueryCollection, isFirebaseEnabled } = await import('../firebase');
+        if (isFirebaseEnabled()) {
+          const boloes = await fsQueryCollection('boloes', 'slug', '==', slug);
+          if (boloes.length > 0) {
+            const data = boloes[0];
+            setBolao(data);
+            // In a real static scenario, matches and rankings would also be in separate collections.
+            // For now, we assume they might be subcollections or we just fetch what we can.
+            setMatches(data.matches || []);
+            setRankings(data.rankings || []);
+            setParticipantsCount(data.participantsCount || 0);
+            return;
+          }
+        }
         setError(err.message);
       })
       .finally(() => {
