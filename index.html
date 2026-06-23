@@ -1,13 +1,73 @@
+
 <!DOCTYPE html>
 <html lang="pt-BR">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>RifaZ</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="src/main.tsx"></script>
-  </body>
-</html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rifa Digital - Plataforma de Sorteios</title>
+  
+  <!-- Tailwind CSS CDN (Play CDN for development/quick setup) -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 
+  <style>
+    * { font-family: 'Inter', sans-serif; }
+    .scrollbar-hide::-webkit-scrollbar { display: none; }
+    .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            orange: {
+              50: '#fff7ed',
+              100: '#ffedd5',
+              200: '#fed7aa',
+              300: '#fdba74',
+              400: '#fb923c',
+              500: '#f97316',
+              600: '#ea580c',
+              700: '#c2410c',
+              800: '#9a3412',
+              900: '#7c2d12',
+            }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="bg-slate-50">
+  <div id="root"></div>
+
+  <!-- Loading Screen -->
+  <div id="loading-screen" class="fixed inset-0 bg-white flex items-center justify-center z-[9999]">
+    <div class="flex flex-col items-center gap-4">
+      <div class="w-12 h-12 border-4 border-orange-100 border-t-orange-600 rounded-full animate-spin"></div>
+      <p class="text-slate-500 font-medium animate-pulse text-sm">Carregando plataforma...</p>
+    </div>
+  </div>
+
+  <script type="module">
+    import { h, render } from 'https://esm.sh/preact';
+    import { App } from './js/app.js';
+    import { seedInitialData } from './js/db.js';
+
+    // Hide loading screen once ready
+    window.addEventListener('load', () => {
+      const loader = document.getElementById('loading-screen');
+      if (loader) loader.style.display = 'none';
+    });
+
+    // Initialize DB and Render
+    seedInitialData();
+    render(h(App), document.getElementById('root'));
+  </script>
+</body>
+</html>
