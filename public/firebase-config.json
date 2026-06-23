@@ -1,8 +1,9 @@
 {
-  "apiKey": "SUA_API_KEY_AQUI",
-  "authDomain": "SEU_SUBDOMINIO.firebaseapp.com",
-  "projectId": "SEU_PROJECT_ID_AQUI",
-  "storageBucket": "SEU_SUBDOMINIO.appspot.com",
-  "messagingSenderId": "SEU_SENDER_ID_AQUI",
-  "appId": "SEU_APP_ID_AQUI"
+  "apiKey": "AIzaSyCVIZ53rVldh7MTqIj3gP1k2pDH92bM1tk",
+  "authDomain": "site-de-rifas-a3597.firebaseapp.com",
+  "projectId": "site-de-rifas-a3597",
+  "storageBucket": "site-de-rifas-a3597.firebasestorage.app",
+  "messagingSenderId": "518724912538",
+  "appId": "1:518724912538:web:ae0eef4651645723d16623",
+  "measurementId": "G-PX4NJWCXNV"
 }
