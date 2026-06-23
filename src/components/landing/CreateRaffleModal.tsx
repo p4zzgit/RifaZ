@@ -123,35 +123,15 @@ export const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({ config, on
     }
 
     for (const file of filesToUpload) {
-      const formData = new FormData();
-      formData.append('image', file as any);
-
-      try {
-        const headers: Record<string, string> = {};
-        const token = localStorage.getItem('token');
-        if (token) {
-          headers['Authorization'] = `Bearer ${token}`;
-        }
-        const res = await fetch('api/upload', {
-          method: 'POST',
-          headers,
-          body: formData
-        });
-        if (!res.ok) {
-          const errData = await res.json().catch(() => ({}));
-          throw new Error(errData.error || 'Falha no upload do servidor');
-        }
-        const data = await res.json();
-        if (data.url) {
-          setForm(prev => ({ 
-            ...prev, 
-            fotoPrincipal: [...prev.fotoPrincipal, data.url] 
-          }));
-        }
-      } catch (err: any) {
-        console.error('Upload error', err);
-        alert('Erro ao enviar imagem: ' + err.message);
-      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result as string;
+        setForm(prev => ({ 
+          ...prev, 
+          fotoPrincipal: [...prev.fotoPrincipal, base64String] 
+        }));
+      };
+      reader.readAsDataURL(file as any);
     }
   };
 
@@ -167,7 +147,7 @@ export const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({ config, on
 
     if (!isBasicInfoValid || !isSlotsValid || !isFaixasValid) {
       setError(isAdminAction 
-        ? 'Por favor, preencha todos os campos obrigatórios (foto não é obrigatória para o administrador).' 
+        ? 'Por favor, preencha todos os campos obrigatórios.' 
         : 'Por favor, preencha todos os campos obrigatórios e envie pelo menos 1 foto.'
       );
       return;
@@ -176,19 +156,63 @@ export const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({ config, on
     setLoading(true);
     setError(null);
     try {
-      const payload = {
-        ...form,
-        slots: form.slots === 'custom' ? form.customSlots : form.slots,
-        email: `${form.usuario}@placeholder.com` // Ensure backend compatibility
+      const { fsSetDocument, fsQueryCollection, initializeFirebaseClient, isFirebaseEnabled } = await import('../../firebase');
+      await initializeFirebaseClient();
+
+      if (!isFirebaseEnabled()) {
+        throw new Error('Serviço indisponível momentaneamente.');
+      }
+
+      // Check if user or slug exists
+      const [uCheck, sCheck] = await Promise.all([
+        fsQueryCollection('usuarios', 'username', '==', form.usuario),
+        fsQueryCollection('rifas', 'slug', '==', form.slug)
+      ]);
+
+      if (uCheck.length > 0) throw new Error('Este nome de usuário já está em uso.');
+      if (sCheck.length > 0) throw new Error('Este link da rifa já está em uso.');
+
+      const userId = `user_${Date.now()}`;
+      const rifaId = `rifa_${Date.now()}`;
+
+      const userData = {
+        id: userId,
+        username: form.usuario,
+        password: form.password,
+        nome: form.name,
+        whatsapp: form.whatsapp,
+        documento: form.documento,
+        email: `${form.usuario}@placeholder.com`,
+        role: 'user',
+        status: 'ativo',
+        saldo: 0,
+        createdAt: new Date().toISOString()
       };
-      const res = await fetch('api/raffles', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Erro ao criar rifa');
-      setSuccess(data);
+
+      const rifaData = {
+        id: rifaId,
+        userId: userId,
+        nome: form.raffleName,
+        descricao: form.descricao,
+        slug: form.slug,
+        tipo: form.tipo,
+        slots: parseInt(form.slots === 'custom' ? form.customSlots : form.slots),
+        price: parseFloat(form.price || '0'),
+        tema: form.tema,
+        corSecundaria: form.corSecundaria,
+        fotoPrincipal: form.fotoPrincipal,
+        faixas: form.faixas,
+        status: 'ativo',
+        createdAt: new Date().toISOString(),
+        bookedNumbers: []
+      };
+
+      await Promise.all([
+        fsSetDocument('usuarios', userId, userData),
+        fsSetDocument('rifas', rifaId, rifaData)
+      ]);
+
+      setSuccess({ rifa: rifaData, user: userData });
     } catch (err: any) {
       setError(err.message);
     } finally {

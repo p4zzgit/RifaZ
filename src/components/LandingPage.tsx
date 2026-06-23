@@ -45,65 +45,16 @@ export default function LandingPage({ onLoginClick, user }: LandingPageProps) {
     }
 
     async function loadConfig() {
-      const { fsGetGlobalConfig, isFirebaseEnabled, initializeFirebaseClient } = await import('../firebase');
-      await initializeFirebaseClient();
-
-      if (isFirebaseEnabled()) {
+      try {
+        const { fsGetGlobalConfig, initializeFirebaseClient } = await import('../firebase');
+        await initializeFirebaseClient();
         const fbConfig = await fsGetGlobalConfig();
         if (fbConfig) {
           setConfig(fbConfig);
-          return;
-        } else {
-          // SEEDING: If not found, create the default one in Firestore
-          console.log('Seeding default config to Firestore...');
-          const defaultConfig = {
-            platformName: 'Rifa Digital',
-            platformLogo: '',
-            primaryColor: '#FFFFFF',
-            secondaryColor: '#FF8C00',
-            contactEmail: 'suporte@rifadigital.com',
-            contactWhatsApp: '',
-            heroTitle: 'Crie sua Rifa Digital em minutos',
-            heroSub: 'A plataforma mais completa para gerenciar seus sorteios online.',
-            featuresTitle: 'Por que escolher nossa plataforma?',
-            featuresLabel: 'Benefícios',
-            features: [
-              { title: 'Rápido e Fácil', desc: 'Crie sua rifa em menos de 2 minutos.', icon: 'Bike' },
-              { title: 'Pagamento Seguro', desc: 'Integração direta com Mercado Pago.', icon: 'ShieldCheck' },
-              { title: 'Gestão Completa', desc: 'Painel administrativo para controle total.', icon: 'Settings' }
-            ],
-            faqs: [],
-            testimonials: [],
-            footerText: '© 2026 Rifa Digital. Todos os direitos reservados.'
-          };
-          const { fsSetDocument } = await import('../firebase');
-          await fsSetDocument('config', 'main', defaultConfig);
-          setConfig(defaultConfig as any);
-          return;
         }
+      } catch (err) {
+        console.error('Config fetch sequence failed:', err);
       }
-      
-      // Fallback
-      setConfig({
-        platformName: 'Rifa Digital',
-        platformLogo: '',
-        primaryColor: '#FFFFFF',
-        secondaryColor: '#FF8C00',
-        contactEmail: 'suporte@rifadigital.com',
-        contactWhatsApp: '',
-        heroTitle: 'Crie sua Rifa Digital em minutos',
-        heroSub: 'A plataforma mais completa para gerenciar seus sorteios online.',
-        featuresTitle: 'Por que escolher nossa plataforma?',
-        featuresLabel: 'Benefícios',
-        features: [
-          { title: 'Rápido e Fácil', desc: 'Crie sua rifa em menos de 2 minutos.', icon: 'Bike' },
-          { title: 'Pagamento Seguro', desc: 'Integração direta com Mercado Pago.', icon: 'ShieldCheck' },
-          { title: 'Gestão Completa', desc: 'Painel administrativo para controle total.', icon: 'Settings' }
-        ],
-        faqs: [],
-        testimonials: [],
-        footerText: '© 2026 Rifa Digital. Todos os direitos reservados.'
-      } as any);
     }
 
     loadConfig().catch(err => console.error('Config fetch sequence failed:', err));

@@ -64,44 +64,43 @@ export default function PublicBolaoView() {
     return v.replace(/(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})/, '$1.$2.$3/$4-$5').substring(0, 18);
   };
 
-  const fetchBolaoDetails = () => {
+  const fetchBolaoDetails = async () => {
     setLoading(true);
-    fetch(`api/boloes/view/${slug}`)
-      .then(async res => {
-        const data = await res.json();
-        if (!res.ok) {
-          if (res.status === 403 && data.isBlocked) {
-            setIsBlocked(true);
-            throw new Error(data.error);
-          }
-          throw new Error(data.error || 'API unavailable');
-        }
-        setBolao(data.bolao);
-        setMatches(data.matches || []);
-        setRankings(data.rankings || []);
-        setParticipantsCount(data.participantsCount || 0);
-      })
-      .catch(async err => {
-        console.log('API bolao view unavailable, falling back to Firebase');
-        const { fsQueryCollection, isFirebaseEnabled } = await import('../firebase');
-        if (isFirebaseEnabled()) {
-          const boloes = await fsQueryCollection('boloes', 'slug', '==', slug);
-          if (boloes.length > 0) {
-            const data = boloes[0];
-            setBolao(data);
-            // In a real static scenario, matches and rankings would also be in separate collections.
-            // For now, we assume they might be subcollections or we just fetch what we can.
-            setMatches(data.matches || []);
-            setRankings(data.rankings || []);
-            setParticipantsCount(data.participantsCount || 0);
-            return;
-          }
-        }
-        setError(err.message);
-      })
-      .finally(() => {
-        setLoading(false);
-      });
+    try {
+      const { fsQueryCollection, fsGetCollection } = await import('../firebase');
+      const boloes = await fsQueryCollection('boloes', 'slug', '==', slug);
+      
+      if (boloes.length === 0) {
+        throw new Error('Bolão não encontrado');
+      }
+
+      const data = boloes[0];
+      setBolao(data);
+      
+      // In a real scenario, matches and rankings are related
+      const allMatches = await fsGetCollection('partidas');
+      const filteredMatches = allMatches.filter((m: any) => m.bolaoId === data.id);
+      setMatches(filteredMatches);
+      
+      const allParticipants = await fsGetCollection('participantes_bolao');
+      const filteredParticipants = allParticipants.filter((p: any) => p.bolaoId === data.id && p.status === 'pago');
+      setParticipantsCount(filteredParticipants.length);
+
+      // Ranking calculation
+      const rankingList = filteredParticipants.map((p: any) => ({
+        id: p.id,
+        nome: p.nome,
+        points: p.points || 0,
+        whatsapp: p.whatsapp,
+        pos: 0
+      })).sort((a: any, b: any) => b.points - a.points);
+      
+      setRankings(rankingList.map((r, i) => ({ ...r, pos: i + 1 })));
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -110,32 +109,46 @@ export default function PublicBolaoView() {
 
   const handleJoinSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!joinForm.name || !joinForm.whatsapp) {
-      alert('Por favor, preencha nome e WhatsApp.');
+    if (!joinForm.name || !joinForm.whatsapp || !joinForm.login || !joinForm.password) {
+      alert('Por favor, preencha todos os campos obrigatórios.');
       return;
     }
     setJoinLoading(true);
 
-    // Format guesses if any
-    const guessList = (Object.entries(activeGuesses) as [string, { guessA: string; guessB: string }][])
-      .filter(([_, value]) => value.guessA !== '' && value.guessB !== '')
-      .map(([matchId, value]) => ({
-        matchId,
-        guessA: parseInt(value.guessA),
-        guessB: parseInt(value.guessB)
-      }));
-
     try {
-      const res = await fetch(`api/boloes/${slug}/join`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...joinForm, guesses: guessList })
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Erro ao participar');
-      setJoinResult(data);
-      // Refresh count
-      setParticipantsCount(prev => prev + 1);
+      const { fsSetDocument, fsQueryCollection } = await import('../firebase');
+      
+      // Check if participant login exists
+      const existing = await fsQueryCollection('participantes_bolao', 'login', '==', joinForm.login);
+      if (existing.length > 0) {
+        throw new Error('Este login já está sendo usado por outro participante.');
+      }
+
+      const participantId = `part_bolao_${Date.now()}`;
+      const newParticipant = {
+        id: participantId,
+        bolaoId: bolao.id,
+        nome: joinForm.name,
+        whatsapp: joinForm.whatsapp,
+        email: joinForm.email,
+        documento: joinForm.documento,
+        login: joinForm.login,
+        password: joinForm.password,
+        status: 'pendente', // Wait for mock payment
+        points: 0,
+        createdAt: new Date().toISOString()
+      };
+
+      await fsSetDocument('participantes_bolao', participantId, newParticipant);
+      
+      // PIX Simulation data
+      const pixData = {
+        id: participantId,
+        copiaECola: `00020101021226870014br.gov.bcb.pix2565pix-qr.mercado-pago.com.br/v2/44f8f4a1-0e4c-47a3-8f64-4458f28d6f5c5204000053039865405${parseFloat(bolao.pricePerParticipant).toFixed(2)}5802BR5925MERCADOPAGO6009SAOPAULO62070503***6304D541`,
+        qrCode: 'iVBORw0KGgoAAAANSUhEUgAAAQAAAAEAAQMAAABmvDolAAAABlBMVEUAAAD///+l2Z/dAAAAAXRSTlMAQObYZgAAAAlwSFlzAAAOxAAADsQBlSsOGwAAAF5JREFUeJztwTEBAAAAwqD1T20LL6AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAHgN6UAAAZXvGzUAAAAASUVORK5CYII='
+      };
+
+      setJoinResult({ participant: newParticipant, pix: pixData });
     } catch (err: any) {
       alert(err.message);
     } finally {
@@ -148,19 +161,27 @@ export default function PublicBolaoView() {
     setAuthError(null);
     setAuthLoading(true);
     try {
-      const res = await fetch(`api/boloes/${slug}/participant-login`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(authForm)
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Login ou senha incorretos.');
+      const { fsQueryCollection, fsGetCollection } = await import('../firebase');
+      const participants = await fsQueryCollection('participantes_bolao', 'login', '==', authForm.login);
       
-      setActiveParticipant(data.participant);
+      const p = participants.find((part: any) => part.password === authForm.password && part.bolaoId === bolao.id);
       
-      // Initialize guesses map
+      if (!p) {
+        throw new Error('Login ou senha incorretos para este bolão.');
+      }
+      
+      if (p.status !== 'pago') {
+        throw new Error('Sua participação ainda não foi confirmada (Pagamento Pendente).');
+      }
+
+      setActiveParticipant(p);
+      
+      // Fetch guesses
+      const allGuesses = await fsGetCollection('palpites');
+      const pGuesses = allGuesses.filter((g: any) => g.participantId === p.id);
+      
       const gMap: Record<string, { guessA: string; guessB: string }> = {};
-      data.guesses.forEach((g: any) => {
+      pGuesses.forEach((g: any) => {
         gMap[g.matchId] = {
           guessA: g.guessA.toString(),
           guessB: g.guessB.toString()
@@ -192,25 +213,33 @@ export default function PublicBolaoView() {
     setSaveGuessesLoading(true);
     setSaveGuessesSuccess(false);
 
-    // Format list
-    const guessList = (Object.entries(activeGuesses) as [string, { guessA: string; guessB: string }][])
-      .filter(([_, value]) => value.guessA !== '' && value.guessB !== '')
-      .map(([matchId, value]) => ({
-        matchId,
-        guessA: parseInt(value.guessA),
-        guessB: parseInt(value.guessB)
-      }));
-
     try {
-      const res = await fetch(`api/boloes/participant/${activeParticipant.id}/guesses`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ guesses: guessList })
-      });
-      if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || 'Erro ao salvar palpites');
+      const { fsSetDocument, fsGetCollection, fsDeleteDocument } = await import('../firebase');
+      
+      // Get all current guesses for this participant to "overwrite"
+      const allGuesses = await fsGetCollection('palpites');
+      const pGuesses = allGuesses.filter((g: any) => g.participantId === activeParticipant.id);
+      
+      // Delete old ones
+      for (const g of pGuesses) {
+        await fsDeleteDocument('palpites', g.id);
       }
+
+      // Save new ones
+      for (const [matchId, value] of Object.entries(activeGuesses)) {
+        if (value.guessA !== '' && value.guessB !== '') {
+          const guessId = `guess_${activeParticipant.id}_${matchId}`;
+          await fsSetDocument('palpites', guessId, {
+            id: guessId,
+            participantId: activeParticipant.id,
+            matchId,
+            guessA: parseInt(value.guessA),
+            guessB: parseInt(value.guessB),
+            createdAt: new Date().toISOString()
+          });
+        }
+      }
+
       setSaveGuessesSuccess(true);
       setTimeout(() => setSaveGuessesSuccess(false), 3000);
     } catch (err: any) {
@@ -891,21 +920,60 @@ export default function PublicBolaoView() {
                 <h3 className="text-base font-black text-gray-950">PIX Copia e Cola Gerado</h3>
                 <p className="text-xs text-gray-500">Efetue o pagamento do PIX. Seu status será modificado de pendente para aprovado automaticamente assim que for detectado!</p>
 
-                {joinResult.pixQrCode && (
-                  <img src={`data:image/png;base64,${joinResult.pixQrCode}`} className="w-40 h-40 object-contain mx-auto border border-gray-105 rounded-xl p-2" />
+                {joinResult.pix?.qrCode && (
+                  <img src={`data:image/png;base64,${joinResult.pix.qrCode}`} className="w-40 h-40 object-contain mx-auto border border-gray-105 rounded-xl p-2" />
                 )}
 
                 <div className="bg-slate-50 p-3 rounded-xl border border-slate-100 text-left font-mono text-[10px] break-all select-all flex items-center gap-2 justify-between">
-                  <span className="flex-1 overflow-hidden truncate">{joinResult.pixCopiaECola || 'Copia e cola não disponível'}</span>
+                  <span className="flex-1 overflow-hidden truncate">{joinResult.pix?.copiaECola || 'Copia e cola não disponível'}</span>
                   <button 
                     onClick={() => {
-                      navigator.clipboard.writeText(joinResult.pixCopiaECola);
+                      navigator.clipboard.writeText(joinResult.pix?.copiaECola || '');
                       alert('Copiado com sucesso!');
                     }}
                     type="button"
                     className="bg-gray-200 hover:bg-gray-300 px-2 py-1 rounded text-gray-700 font-bold uppercase shrink-0"
                   >
                     Copiar
+                  </button>
+                </div>
+
+                {/* MOCK PAYMENT BUTTONS FOR BOLÃO */}
+                <div className="grid grid-cols-3 gap-2 py-2">
+                  <button
+                    onClick={async () => {
+                      const { fsSetDocument, fsGetCollection } = await import('../firebase');
+                      // 1. Approve participation
+                      await fsSetDocument('participantes_bolao', joinResult.participant.id, { status: 'pago' });
+                      
+                      // 2. Update Organizer Balance
+                      const users = await fsGetCollection('usuarios');
+                      const owner = users.find((u: any) => u.id === bolao.userId);
+                      if (owner) {
+                        const fee = parseFloat(bolao.pricePerParticipant);
+                        await fsSetDocument('usuarios', owner.id, { saldo: (owner.saldo || 0) + fee });
+                      }
+
+                      alert('Pagamento Aprovado com Sucesso!');
+                      setShowJoinModal(false);
+                      fetchBolaoDetails();
+                      setAuthForm({ login: joinForm.login, password: joinForm.password });
+                    }}
+                    className="bg-green-500 text-white text-[9px] font-black py-2 rounded-lg hover:bg-green-600 uppercase"
+                  >
+                    Aprovar
+                  </button>
+                  <button
+                    onClick={() => { setShowJoinModal(false); alert('Pagamento Recusado'); }}
+                    className="bg-red-500 text-white text-[9px] font-black py-2 rounded-lg hover:bg-red-600 uppercase"
+                  >
+                    Recusar
+                  </button>
+                  <button
+                    onClick={() => { setShowJoinModal(false); alert('Pagamento Expirado'); }}
+                    className="bg-gray-400 text-white text-[9px] font-black py-2 rounded-lg hover:bg-gray-500 uppercase"
+                  >
+                    Expirar
                   </button>
                 </div>
 

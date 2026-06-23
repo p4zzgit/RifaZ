@@ -67,35 +67,15 @@ export const CreateBolaoModal: React.FC<CreateBolaoModalProps> = ({ config, onCl
     if (!files || files.length === 0) return;
 
     const file = files[0];
-    const formData = new FormData();
-    formData.append('image', file);
-
-    try {
-      const headers: Record<string, string> = {};
-      const token = localStorage.getItem('token');
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-      const res = await fetch('api/upload', {
-        method: 'POST',
-        headers,
-        body: formData
-      });
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({}));
-        throw new Error(errData.error || 'Falha no upload do servidor');
-      }
-      const data = await res.json();
-      if (data.url) {
-        setForm(prev => ({ 
-          ...prev, 
-          [field]: data.url 
-        }));
-      }
-    } catch (err: any) {
-      console.error('Upload error', err);
-      alert('Erro ao enviar imagem: ' + err.message);
-    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64String = reader.result as string;
+      setForm(prev => ({ 
+        ...prev, 
+        [field]: base64String 
+      }));
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -134,14 +114,56 @@ export const CreateBolaoModal: React.FC<CreateBolaoModalProps> = ({ config, onCl
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('api/boloes', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form)
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Erro ao criar bolão');
-      setSuccess(data);
+      const { fsSetDocument, fsQueryCollection, initializeFirebaseClient, isFirebaseEnabled } = await import('../../firebase');
+      await initializeFirebaseClient();
+
+      if (!isFirebaseEnabled()) {
+        throw new Error('Serviço indisponível momentaneamente.');
+      }
+
+      // Check if user exists
+      const uCheck = await fsQueryCollection('usuarios', 'username', '==', form.username);
+      if (uCheck.length > 0) throw new Error('Este nome de usuário já está em uso.');
+
+      const userId = `user_${Date.now()}`;
+      const bolaoId = `bolao_${Date.now()}`;
+
+      const userData = {
+        id: userId,
+        username: form.username,
+        password: form.password,
+        nome: form.organizerName,
+        whatsapp: form.whatsapp,
+        documento: form.organizerCpf,
+        email: form.email,
+        role: 'user',
+        status: 'ativo',
+        saldo: 0,
+        createdAt: new Date().toISOString()
+      };
+
+      const bolaoData = {
+        id: bolaoId,
+        userId: userId,
+        nome: form.bolaoName,
+        descricao: form.description,
+        endDate: form.endDate,
+        pricePerParticipant: parseFloat(form.pricePerParticipant),
+        maxParticipants: parseInt(form.maxParticipants),
+        logoUrl: form.logoUrl,
+        bannerUrl: form.bannerUrl,
+        championshipName: form.championshipName,
+        competitionName: form.competitionName,
+        status: 'ativo',
+        createdAt: new Date().toISOString()
+      };
+
+      await Promise.all([
+        fsSetDocument('usuarios', userId, userData),
+        fsSetDocument('boloes', bolaoId, bolaoData)
+      ]);
+
+      setSuccess({ bolao: bolaoData, user: userData });
     } catch (err: any) {
       setError(err.message);
     } finally {

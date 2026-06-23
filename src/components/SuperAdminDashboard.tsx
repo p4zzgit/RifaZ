@@ -208,22 +208,13 @@ export default function SuperAdminDashboard() {
 
   const handleUpdateRaffleStatus = async (id: string, status: 'ativa' | 'suspensa') => {
     try {
-      const res = await fetch(`api/admin/raffles/${id}/status`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({ status })
-      });
-      if (res.ok) {
+      const { fsSetDocument, isFirebaseEnabled } = await import('../firebase');
+      if (isFirebaseEnabled()) {
+        await fsSetDocument('rifas', id, { status: status === 'ativa' ? 'ativo' : 'suspensa' });
         loadDashboard();
-      } else {
-        const err = await res.json();
-        alert(err.error || 'Erro ao atualizar status');
       }
     } catch (err) {
-      alert('Erro de conexão');
+      alert('Erro ao atualizar status');
     }
   };
 
@@ -239,22 +230,13 @@ export default function SuperAdminDashboard() {
 
   const handleUpdateBolaoStatus = async (id: string, status: 'ativo' | 'suspenso') => {
     try {
-      const res = await fetch(`api/admin/boloes/${id}/status`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({ status })
-      });
-      if (res.ok) {
+      const { fsSetDocument, isFirebaseEnabled } = await import('../firebase');
+      if (isFirebaseEnabled()) {
+        await fsSetDocument('boloes', id, { status });
         loadDashboard();
-      } else {
-        const err = await res.json();
-        alert(err.error || 'Erro ao atualizar status');
       }
     } catch (err) {
-      alert('Erro de conexão');
+      alert('Erro ao atualizar status');
     }
   };
 
@@ -283,48 +265,68 @@ export default function SuperAdminDashboard() {
     const { type, id } = deleteConfirmModal;
     
     try {
-      let url = '';
-      if (type === 'USER') url = `api/admin/users/${id}`;
-      else if (type === 'RAFFLE') url = `api/admin/raffles/${id}`;
-      else if (type === 'BOLAO') url = `api/admin/boloes/${id}`;
-      else if (type === 'WITHDRAWAL') url = `api/admin/withdrawals/${id}`;
+      const { fsGetDocument, fsSetDocument, fsDeleteDocument, isFirebaseEnabled } = await import('../firebase');
+      if (!isFirebaseEnabled()) return;
 
-      const res = await fetch(url, {
-        method: 'DELETE',
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}` 
-        },
-        body: JSON.stringify({ password, motivo: reason })
-      });
+      const collections: Record<string, string> = {
+        'USER': 'usuarios',
+        'RAFFLE': 'rifas',
+        'BOLAO': 'boloes',
+        'WITHDRAWAL': 'withdrawals'
+      };
 
-      if (res.ok) {
+      const trashCollections: Record<string, string> = {
+        'USER': 'trash_users',
+        'RAFFLE': 'trash_rifas',
+        'BOLAO': 'trash_boloes',
+        'WITHDRAWAL': 'trash_withdrawals'
+      };
+
+      const col = collections[type];
+      const trashCol = trashCollections[type];
+
+      const item = await fsGetDocument(col, id);
+      if (item) {
+        if (trashCol) {
+          await fsSetDocument(trashCol, id, { 
+            ...item, 
+            deletedAt: new Date().toISOString(),
+            motivoExclusao: reason 
+          });
+        }
+        await fsDeleteDocument(col, id);
+        
+        // Log the action
+        await fsSetDocument('logs', `log_${Date.now()}`, {
+          action: `DELETED_${type}`,
+          itemId: id,
+          itemName: deleteConfirmModal.itemName,
+          reason,
+          timestamp: new Date().toISOString()
+        });
+
         setDeleteConfirmModal(null);
         loadDashboard();
-      } else {
-        const err = await res.json();
-        throw new Error(err.error || 'Erro ao deletar registro');
       }
     } catch (err: any) {
-      throw err;
+      console.error('Delete failed:', err);
+      alert('Erro ao excluir item');
     }
   };
 
   const handleRestore = async (type: 'usuarios' | 'rifas' | 'boloes', id: string) => {
     if (!confirm('Deseja realmente restaurar este registro?')) return;
     try {
-      const res = await fetch(`api/admin/restore/${type}/${id}`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
-      if (res.ok) {
+      const { fsGetDocument, fsSetDocument, fsDeleteDocument } = await import('../firebase');
+      const trashCol = type === 'usuarios' ? 'trash_users' : type === 'rifas' ? 'trash_rifas' : 'trash_boloes';
+      const item = await fsGetDocument(trashCol, id);
+      if (item) {
+        await fsSetDocument(type, id, { ...item, deletedAt: null, motivoExclusao: null });
+        await fsDeleteDocument(trashCol, id);
         loadDashboard();
-      } else {
-        const err = await res.json();
-        alert(err.error || 'Erro ao restaurar registro');
       }
     } catch (e) {
-      alert('Erro de conexão');
+      alert('Erro ao restaurar registro');
     }
   };
 
@@ -337,23 +339,15 @@ export default function SuperAdminDashboard() {
     }
 
     try {
-      const res = await fetch(`api/admin/withdrawals/${rejectionModal.withdrawalId}`, {
-        method: 'PUT',
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}` 
-        },
-        body: JSON.stringify({ status: 'recusado', motivoRejeicao: finalReason })
+      const { fsSetDocument } = await import('../firebase');
+      await fsSetDocument('withdrawals', rejectionModal.withdrawalId, { 
+        status: 'recusado', 
+        motivoRejeicao: finalReason 
       });
-      if (res.ok) {
-        setRejectionModal(null);
-        loadDashboard();
-      } else {
-        const data = await res.json();
-        alert(data.error || 'Erro ao rejeitar saque.');
-      }
+      setRejectionModal(null);
+      loadDashboard();
     } catch (e) {
-      alert('Erro de conexão ao rejeitar saque.');
+      alert('Erro ao rejeitar saque.');
     }
   };
 
@@ -362,34 +356,23 @@ export default function SuperAdminDashboard() {
     if (!editingUser) return;
     setSaving(true);
     try {
-      const res = await fetch(`api/admin/users/${editingUser.id}`, {
-        method: 'PUT',
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}` 
-        },
-        body: JSON.stringify({
-          nome: editingUser.nome,
-          usuario: editingUser.usuario,
-          email: editingUser.email,
-          documento: editingUser.documento,
-          whatsapp: editingUser.whatsapp,
-          customFee: editingUser.customFee,
-          status: editingUser.status,
-          password: editingUser.password || undefined
-        })
+      const { fsSetDocument } = await import('../firebase');
+      await fsSetDocument('usuarios', editingUser.id, {
+        nome: editingUser.nome,
+        usuario: editingUser.usuario,
+        email: editingUser.email,
+        documento: editingUser.documento,
+        whatsapp: editingUser.whatsapp,
+        customFee: editingUser.customFee,
+        status: editingUser.status,
+        ...(editingUser.password ? { password: editingUser.password } : {})
       });
-      if (res.ok) {
-        alert('Usuário atualizado com sucesso!');
-        setShowEditUserModal(false);
-        setEditingUser(null);
-        loadDashboard();
-      } else {
-        const data = await res.json();
-        alert(data.error || 'Erro ao atualizar dados do usuário');
-      }
+      alert('Usuário atualizado com sucesso!');
+      setShowEditUserModal(false);
+      setEditingUser(null);
+      loadDashboard();
     } catch (e) {
-      alert('Erro de conexão');
+      alert('Erro ao atualizar dados do usuário');
     } finally {
       setSaving(false);
     }
@@ -412,15 +395,15 @@ export default function SuperAdminDashboard() {
     e.preventDefault();
     setSaving(true);
     try {
-      const res = await fetch('api/admin/profile', {
-        method: 'PUT',
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}` 
-        },
-        body: JSON.stringify(profileForm)
-      });
-      if (res.ok) {
+      const { fsGetCollection, fsSetDocument } = await import('../firebase');
+      const allUsers = await fsGetCollection('usuarios');
+      const me = allUsers.find((u: any) => u.role === 'super_admin');
+      if (me) {
+        await fsSetDocument('usuarios', me.id, {
+          nome: profileForm.nome,
+          usuario: profileForm.usuario,
+          ...(profileForm.password ? { password: profileForm.password } : {})
+        });
         alert('Perfil atualizado com sucesso!');
         loadDashboard();
       }
@@ -441,25 +424,13 @@ export default function SuperAdminDashboard() {
       return;
     }
 
-    const formData = new FormData();
-    formData.append('image', file);
-    
-    try {
-      const res = await fetch('api/upload', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-        body: formData
-      });
-      
-      if (!res.ok) throw new Error('Falha no upload');
-      
-      const data = await res.json();
-      if (config) setConfig({ ...config, [field]: data.url });
-      alert('Arquivo enviado! Lembre-se de salvar as alterações da plataforma no botão abaixo.');
-    } catch (err) {
-      console.error(err);
-      alert('Erro ao enviar arquivo. Verifique sua conexão.');
-    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64String = reader.result as string;
+      if (config) setConfig({ ...config, [field]: base64String });
+      alert('Arquivo carregado localmente! Lembre-se de salvar as alterações da plataforma no botão abaixo.');
+    };
+    reader.readAsDataURL(file);
   };
 
   // Base client users

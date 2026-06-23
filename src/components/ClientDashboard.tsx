@@ -62,66 +62,69 @@ export default function ClientDashboard() {
   async function loadAllData() {
     setLoading(true);
     try {
-      const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` };
+      const { 
+        fsGetGlobalConfig, 
+        fsGetCollection, 
+        fsQueryCollection,
+        initializeFirebaseClient,
+        isFirebaseEnabled 
+      } = await import('../firebase');
       
-      // Load shared stats and profile info
-      const [wRes, fRes, cRes, pRes] = await Promise.all([
-        fetch('api/me/withdrawals', { headers }),
-        fetch('api/me/finance', { headers }),
-        fetch('api/config'),
-        fetch('api/me/profile', { headers }).catch(() => null)
-      ]);
-
-      setWithdrawals(await parseResponse(wRes));
-      setFinance(await parseResponse(fRes));
-      const configData = await cRes.json().catch(() => null);
-      if (configData) {
-        setSuporteWhatsapp(configData.suporteWhatsapp || '');
-        setConfig(configData);
+      await initializeFirebaseClient();
+      if (!isFirebaseEnabled()) {
+        console.warn('Firebase not enabled for client dashboard');
+        setLoading(false);
+        return;
       }
 
-      if (pRes) {
-        const profileData = await parseResponse(pRes);
-        if (profileData) {
-          setPixKeys(profileData.pixKeys || []);
-          setPixHistory(profileData.pixHistory || []);
-        }
+      // In a real app with Auth, we would filter by current user ID
+      // For this PoC, we load all data or assume filtered view if we had a userId
+      const [cData, wData, rData, bData, uData] = await Promise.all([
+        fsGetGlobalConfig(),
+        fsGetCollection('withdrawals'),
+        fsGetCollection('rifas'),
+        fsGetCollection('boloes'),
+        fsGetCollection('usuarios') // To find our own profile
+      ]);
+
+      if (cData) {
+        setSuporteWhatsapp(cData.suporteWhatsapp || '');
+        setConfig(cData);
+      }
+      setWithdrawals(wData);
+      
+      // Mock finance for static
+      setFinance({
+        balance: 1250.50,
+        pending: 350.00,
+        totalWithdrawn: wData.filter((w: any) => w.status === 'aprovado').reduce((acc: number, w: any) => acc + (w.valor || 0), 0)
+      });
+
+      // Find "my" user (in static PoC we might not have a real auth context yet)
+      const myUser = uData[0]; 
+      if (myUser) {
+        setPixKeys(myUser.pixKeys || []);
+        setPixHistory(myUser.pixHistory || []);
       }
 
       if (productMode === 'rifas') {
-        const rRes = await fetch('api/me/raffles', { headers });
-        const rData = await parseResponse(rRes);
         setRifas(rData);
-        
-        // NEW SELECTION RULE: Default activeRifa to null so the user must select from Dashboard -> Início.
         if (activeRifa) {
           const found = rData.find((r: any) => r.id === activeRifa.id);
           if (found) {
             setActiveRifa(found);
-            const pRes = await fetch(`api/me/raffles/${found.id}/participants`, { headers });
-            setRaffleParticipants(await parseResponse(pRes));
-          } else {
-            setActiveRifa(null);
-            setRaffleParticipants([]);
+            const pData = await fsGetCollection(`rifas/${found.id}/participants`);
+            setRaffleParticipants(pData);
           }
-        } else {
-          setActiveRifa(null);
-          setRaffleParticipants([]);
         }
       } else {
-        const bRes = await fetch('api/me/boloes', { headers });
-        const bData = await parseResponse(bRes);
         setBoloes(bData);
         if (bData.length > 0) {
           handleSelectBolao(bData[0].id);
-        } else {
-          setActiveBolao(null);
-          setBolaoMatches([]);
-          setBolaoParticipants([]);
         }
       }
     } catch (e) {
-      console.error('Data loading error:', e);
+      console.error('Data loading error from Firebase:', e);
     } finally {
       setLoading(false);
     }
@@ -179,25 +182,21 @@ export default function ClientDashboard() {
     setShowPixConfirm(false);
     setPixSaving(true);
     try {
-      const headers = { 
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('token')}` 
-      };
-      const response = await fetch('api/me/pix', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({ keys: editingPixKeys })
-      });
-      const data = await response.json();
-      if (response.ok) {
-        setPixKeys(data.pixKeys);
-        setPixHistory(data.pixHistory);
+      const { fsSetDocument, fsGetCollection } = await import('../firebase');
+      const allUsers = await fsGetCollection('usuarios');
+      const me = allUsers[0]; // Assuming first user for demo
+      if (me) {
+        await fsSetDocument('usuarios', me.id, { 
+          pixKeys: editingPixKeys,
+          pixHistory: [...(me.pixHistory || []), { date: new Date().toISOString(), type: 'CONFIG', detail: 'Chaves atualizadas' }]
+        });
+        const updatedUser = (await fsGetCollection('usuarios')).find(u => u.id === me.id);
+        setPixKeys(updatedUser.pixKeys);
+        setPixHistory(updatedUser.pixHistory);
         setShowConfigPix(false);
-      } else {
-        alert(data.error || 'Erro ao salvar chaves PIX');
       }
     } catch (err: any) {
-      alert('Erro ao conectar com servidor.');
+      alert('Erro ao salvar chaves PIX localmente.');
     } finally {
       setPixSaving(false);
     }
@@ -205,13 +204,14 @@ export default function ClientDashboard() {
 
   const handleSelectBolao = async (id: string) => {
     try {
-      const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` };
-      const res = await fetch(`api/me/boloes/${id}`, { headers });
-      const data = await parseResponse(res);
-      if (data && data.bolao) {
-        setActiveBolao(data.bolao);
-        setBolaoMatches(data.matches || []);
-        setBolaoParticipants(data.participants || []);
+      const { fsGetDocument, fsQueryCollection } = await import('../firebase');
+      const bolao = await fsGetDocument('boloes', id);
+      if (bolao) {
+        setActiveBolao(bolao);
+        const matches = await fsQueryCollection('bolao_matches', 'bolaoId', '==', id);
+        setBolaoMatches(matches || []);
+        const participants = await fsQueryCollection('participantes', 'bolaoId', '==', id);
+        setBolaoParticipants(participants || []);
       }
     } catch (err) {
       console.error('Bolao select error:', err);
@@ -221,9 +221,9 @@ export default function ClientDashboard() {
   const handleSelectRifa = async (rifa: Rifa) => {
     setActiveRifa(rifa);
     try {
-      const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` };
-      const pRes = await fetch(`api/me/raffles/${rifa.id}/participants`, { headers });
-      setRaffleParticipants(await parseResponse(pRes));
+      const { fsQueryCollection } = await import('../firebase');
+      const pData = await fsQueryCollection('participantes', 'rifaSlug', '==', rifa.slug);
+      setRaffleParticipants(pData);
     } catch (err) {
       console.error(err);
     }
@@ -246,39 +246,25 @@ export default function ClientDashboard() {
     const pid = productMode === 'rifas' ? activeRifa?.id : activeBolao?.id;
     if (!pid) return alert('Selecione uma Rifa ou um Bolão ativo para retirar saldo.');
     
-    const availableBalance = productMode === 'rifas' ? finance?.saldoDisponivelRifas : finance?.saldoDisponivelBoloes;
-    if (parseFloat(requestValue) > (availableBalance || 0)) {
-      return alert(`Saldo disponível insuficiente (${productMode === 'rifas' ? 'Rifas' : 'Bolões'}).`);
-    }
-
     setSaving(true);
     try {
-      const payload: any = {
-        amount: parseFloat(requestValue),
-        pixKey: requestPix
-      };
-      if (productMode === 'rifas') payload.raffleId = pid;
-      else payload.bolaoId = pid;
-
-      const res = await fetch('api/withdrawals', {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}` 
-        },
-        body: JSON.stringify(payload)
+      const { fsSetDocument } = await import('../firebase');
+      const withdrawalId = 'w_' + Date.now();
+      await fsSetDocument('withdrawals', withdrawalId, {
+        id: withdrawalId,
+        valorSolicitado: parseFloat(requestValue),
+        pixKey: requestPix,
+        status: 'pendente',
+        productType: productMode,
+        productId: pid,
+        createdAt: new Date().toISOString()
       });
-      if (res.ok) {
-        alert('Solicitação de saque enviada com sucesso!');
-        setRequestValue('');
-        setRequestPix('');
-        loadAllData();
-      } else {
-        const err = await res.json();
-        alert(err.error || 'Erro ao processar saque.');
-      }
+      alert('Solicitação de saque enviada com sucesso!');
+      setRequestValue('');
+      setRequestPix('');
+      loadAllData();
     } catch (e) {
-      alert('Erro de conexão.');
+      alert('Erro ao processar saque localmente.');
     } finally {
       setSaving(false);
     }
@@ -289,17 +275,11 @@ export default function ClientDashboard() {
     if (!activeRifa) return;
     setSaving(true);
     try {
-      const res = await fetch(`api/raffles/${activeRifa.id}`, {
-        method: 'PUT',
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}` 
-        },
-        body: JSON.stringify(activeRifa)
-      });
-      if (res.ok) alert('Rifa atualizada com sucesso!');
+      const { fsSetDocument } = await import('../firebase');
+      await fsSetDocument('rifas', activeRifa.id, activeRifa);
+      alert('Rifa atualizada com sucesso!');
     } catch (err) {
-      alert('Erro ao atualizar rifa.');
+      alert('Erro ao atualizar rifa localmente.');
     } finally {
       setSaving(false);
     }
@@ -310,20 +290,12 @@ export default function ClientDashboard() {
     if (!activeBolao) return;
     setSaving(true);
     try {
-      const res = await fetch(`api/me/boloes/${activeBolao.id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify(activeBolao)
-      });
-      if (res.ok) {
-        alert('Configurações do Bolão salvas com sucesso!');
-        handleSelectBolao(activeBolao.id);
-      }
+      const { fsSetDocument } = await import('../firebase');
+      await fsSetDocument('boloes', activeBolao.id, activeBolao);
+      alert('Configurações do Bolão salvas com sucesso!');
+      handleSelectBolao(activeBolao.id);
     } catch (err) {
-      alert('Erro ao atualizar bolão.');
+      alert('Erro ao atualizar bolão localmente.');
     } finally {
       setSaving(false);
     }
@@ -333,23 +305,16 @@ export default function ClientDashboard() {
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: string, type: 'rifa' | 'bolao') => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const formData = new FormData();
-    formData.append('image', file);
-    try {
-      const res = await fetch('api/upload', {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
-        body: formData
-      });
-      const data = await res.json();
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64String = reader.result as string;
       if (type === 'rifa' && activeRifa) {
-        setActiveRifa({ ...activeRifa, [field]: data.url });
+        setActiveRifa({ ...activeRifa, [field]: base64String });
       } else if (type === 'bolao' && activeBolao) {
-        setActiveBolao({ ...activeBolao, [field]: data.url });
+        setActiveBolao({ ...activeBolao, [field]: base64String });
       }
-    } catch (e) {
-      alert('Erro ao enviar imagem.');
-    }
+    };
+    reader.readAsDataURL(file);
   };
 
   // --- BOLÃO MATCHES MANAGEMENT ---
@@ -358,21 +323,19 @@ export default function ClientDashboard() {
     if (!activeBolao || !matchForm.teamA || !matchForm.teamB) return;
     setSaving(true);
     try {
-      const res = await fetch(`api/me/boloes/${activeBolao.id}/matches`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify(matchForm)
+      const { fsSetDocument } = await import('../firebase');
+      const matchId = 'm_' + Date.now();
+      await fsSetDocument('bolao_matches', matchId, {
+        id: matchId,
+        bolaoId: activeBolao.id,
+        ...matchForm,
+        status: 'pendente'
       });
-      if (res.ok) {
-        setMatchForm({ teamA: '', teamB: '', date: new Date().toISOString() });
-        setShowMatchForm(false);
-        handleSelectBolao(activeBolao.id);
-      }
+      setMatchForm({ teamA: '', teamB: '', date: new Date().toISOString() });
+      setShowMatchForm(false);
+      handleSelectBolao(activeBolao.id);
     } catch (err) {
-      alert('Erro ao adicionar partida.');
+      alert('Erro ao adicionar partida localmente.');
     } finally {
       setSaving(false);
     }
@@ -381,34 +344,22 @@ export default function ClientDashboard() {
   const handleUpdateMatchScore = async (matchId: string, payload: any) => {
     if (!activeBolao) return;
     try {
-      const res = await fetch(`api/me/boloes/${activeBolao.id}/matches/${matchId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify(payload)
-      });
-      if (res.ok) {
-        handleSelectBolao(activeBolao.id);
-      }
+      const { fsSetDocument } = await import('../firebase');
+      await fsSetDocument('bolao_matches', matchId, payload);
+      handleSelectBolao(activeBolao.id);
     } catch (err) {
-      alert('Erro ao atualizar partida.');
+      alert('Erro ao atualizar partida localmente.');
     }
   };
 
   const handleDeleteMatch = async (matchId: string) => {
     if (!activeBolao || !confirm('Tem certeza de que deseja excluir esta partida do bolão?')) return;
     try {
-      const res = await fetch(`api/me/boloes/${activeBolao.id}/matches/${matchId}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
-      });
-      if (res.ok) {
-        handleSelectBolao(activeBolao.id);
-      }
+      const { fsDeleteDocument } = await import('../firebase');
+      await fsDeleteDocument('bolao_matches', matchId);
+      handleSelectBolao(activeBolao.id);
     } catch (err) {
-      alert('Erro ao excluir partida.');
+      alert('Erro ao excluir partida localmente.');
     }
   };
 

@@ -29,50 +29,41 @@ export default function PublicRaffleView() {
     documento: ''
   });
 
-  const fetchRaffle = () => {
-    fetch(`api/raffles/view/${slug}`)
-      .then(async res => {
-        if (!res.ok) throw new Error('Rifa não encontrada');
-        return res.json();
-      })
-      .then(data => {
-        setRifa(data);
-        // Fetch booked numbers
-        return fetch(`api/admin/raffles`); // We need a public endpoint for participants though
-      })
-      .catch(err => {
-        console.error('Rifa view error:', err);
-      });
+  const fetchRaffle = async () => {
+    const { fsQueryCollection, isFirebaseEnabled } = await import('../firebase');
+    if (isFirebaseEnabled()) {
+      const raffles = await fsQueryCollection('rifas', 'slug', '==', slug);
+      if (raffles.length > 0) {
+        setRifa(raffles[0]);
+      }
+    }
   };
 
   useEffect(() => {
     const load = async () => {
-        try {
-            const res = await fetch(`api/raffles/view/${slug}`);
-            if (!res.ok) throw new Error('API unavailable');
-            const data = await res.json();
+      try {
+        const { 
+          fsQueryCollection, 
+          isFirebaseEnabled, 
+          initializeFirebaseClient 
+        } = await import('../firebase');
+        
+        await initializeFirebaseClient();
+        if (isFirebaseEnabled()) {
+          const raffles = await fsQueryCollection('rifas', 'slug', '==', slug);
+          if (raffles.length > 0) {
+            const data = raffles[0];
             setRifa(data);
             if (data.bookedNumbers) {
               setBookedNumbers(data.bookedNumbers);
             }
-            setLoading(false);
-        } catch (e) {
-            console.log('API raffle view unavailable, falling back to Firebase');
-            const { fsQueryCollection, isFirebaseEnabled } = await import('../firebase');
-            if (isFirebaseEnabled()) {
-              const raffles = await fsQueryCollection('rifas', 'slug', '==', slug);
-              if (raffles.length > 0) {
-                const data = raffles[0];
-                setRifa(data);
-                if (data.bookedNumbers) {
-                  setBookedNumbers(data.bookedNumbers);
-                }
-                setLoading(false);
-                return;
-              }
-            }
-            setLoading(false);
+          }
         }
+      } catch (e) {
+        console.error('Firebase raffle view error:', e);
+      } finally {
+        setLoading(false);
+      }
     };
     load();
   }, [slug]);
@@ -83,16 +74,16 @@ export default function PublicRaffleView() {
     // Numbers are already loaded in the initial fetch
   }, [rifa]);
 
-  // Polling for payment status
+  // Polling for payment status (Firebase simulation)
   useEffect(() => {
     if (purchaseStep !== 'payment' || !pendingPurchase) return;
 
     const interval = setInterval(async () => {
       try {
-        const res = await fetch(`api/purchases/${pendingPurchase.id}`);
-        if (res.ok) {
-          const data = await res.json();
-          if (data.status === 'pago') {
+        const { fsGetDocument, isFirebaseEnabled } = await import('../firebase');
+        if (isFirebaseEnabled()) {
+          const purchase = await fsGetDocument('participantes', pendingPurchase.id);
+          if (purchase && purchase.status === 'pago') {
             setPurchaseStep('success');
             clearInterval(interval);
           }
@@ -139,52 +130,25 @@ export default function PublicRaffleView() {
   const handlePurchase = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch(`api/raffles/${slug}/purchase`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          ...form,
-          numbers: selectedNumbers,
-          total: calculateTotal()
-        })
-      });
+      const { fsSetDocument } = await import('../firebase');
+      const purchaseId = 'p_' + Math.random().toString(36).substr(2, 9);
+      const purchaseData = {
+        id: purchaseId,
+        ...form,
+        rifaSlug: slug,
+        numbers: selectedNumbers,
+        total: calculateTotal(),
+        status: 'pendente',
+        createdAt: new Date().toISOString(),
+        pixCopiaECola: '00020126330014BR.GOV.BCB.PIX0111' + (form.whatsapp || 'suporte') + '520400005303986540' + calculateTotal().toFixed(2) + '5802BR5908FAZENDA6009SAO PAULO62070503***6304',
+        pixQrCode: '' 
+      };
       
-      if (res.ok) {
-        const data = await res.json();
-        setPendingPurchase(data);
-        setPurchaseStep('payment');
-        return;
-      }
-
-      // Fallback for GH Pages
-      console.log('API purchase unavailable, falling back to Firebase');
-      const { fsSetDocument, isFirebaseEnabled } = await import('../firebase');
-      if (isFirebaseEnabled()) {
-        const purchaseId = 'p_' + Math.random().toString(36).substr(2, 9);
-        const purchaseData = {
-          id: purchaseId,
-          ...form,
-          rifaSlug: slug,
-          numbers: selectedNumbers,
-          total: calculateTotal(),
-          status: 'pendente',
-          createdAt: new Date().toISOString(),
-          pixCopiaECola: '00020126330014BR.GOV.BCB.PIX0111' + (form.whatsapp || 'suporte') + '520400005303986540' + calculateTotal().toFixed(2) + '5802BR5908FAZENDA6009SAO PAULO62070503***6304',
-          pixQrCode: '' // In static mode we might not have a QR generator easily
-        };
-        
-        const success = await fsSetDocument('compras', purchaseId, purchaseData);
-        if (success) {
-          setPendingPurchase(purchaseData as any);
-          setPurchaseStep('payment');
-          return;
-        }
-      }
-      
-      throw new Error('Serviço de pagamento indisponível no momento.');
-    } catch (error: any) {
-      console.error('Purchase error:', error);
-      alert(error.message || 'Ocorreu um erro ao gerar o pagamento.');
+      await fsSetDocument('participantes', purchaseId, purchaseData);
+      setPendingPurchase(purchaseData as any);
+      setPurchaseStep('payment');
+    } catch (err) {
+      alert('Erro ao processar reserva localmente.');
     }
   };
 
@@ -464,6 +428,54 @@ export default function PublicRaffleView() {
               <div className="flex items-center justify-center gap-3 py-4 px-6 bg-orange-50 rounded-[1.5rem] border border-orange-100/50">
                 <Loader2 className="w-4 h-4 animate-spin text-[#FF8C00]" />
                 <span className="text-[11px] font-black text-[#FF8C00] uppercase tracking-widest">Verificando pagamento...</span>
+              </div>
+
+              {/* MOCK PAYMENT BUTTONS FOR STATIC DEMO */}
+              <div className="grid grid-cols-3 gap-2 pt-4">
+                <button 
+                  onClick={async () => {
+                    const { fsSetDocument, fsGetDocument } = await import('../firebase');
+                    // 1. Approve purchase
+                    await fsSetDocument('participantes', pendingPurchase.id, { status: 'pago' });
+                    // 2. Update Raffle booked numbers
+                    const currentRifa = await fsGetDocument('rifas', rifa.id);
+                    if (currentRifa) {
+                      const newBooked = [...(currentRifa.bookedNumbers || []), ...selectedNumbers];
+                      await fsSetDocument('rifas', rifa.id, { bookedNumbers: newBooked });
+                    }
+                    // 3. Update User Balance (Finance)
+                    const users = await (await import('../firebase')).fsGetCollection('usuarios');
+                    const owner = users.find((u: any) => u.id === rifa.userId);
+                    if (owner) {
+                      const newBalance = (owner.saldo || 0) + (pendingPurchase.total || 0);
+                      await fsSetDocument('usuarios', owner.id, { saldo: newBalance });
+                    }
+                    setPurchaseStep('success');
+                  }}
+                  className="bg-green-500 text-white text-[9px] font-black py-2 rounded-lg hover:bg-green-600 uppercase"
+                >
+                  Aprovar
+                </button>
+                <button 
+                  onClick={() => {
+                    setPurchaseStep('selection');
+                    setSelectedNumbers([]);
+                    alert('Pagamento Recusado');
+                  }}
+                  className="bg-red-500 text-white text-[9px] font-black py-2 rounded-lg hover:bg-red-600 uppercase"
+                >
+                  Recusar
+                </button>
+                <button 
+                   onClick={() => {
+                    setPurchaseStep('selection');
+                    setSelectedNumbers([]);
+                    alert('Pagamento Expirado');
+                  }}
+                  className="bg-gray-400 text-white text-[9px] font-black py-2 rounded-lg hover:bg-gray-500 uppercase"
+                >
+                  Expirar
+                </button>
               </div>
             </div>
 

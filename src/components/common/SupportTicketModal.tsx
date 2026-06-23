@@ -58,14 +58,20 @@ export const SupportTicketModal: React.FC<SupportTicketModalProps> = ({ onClose 
     setError(null);
 
     try {
-      const res = await fetch('api/support/ticket', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form)
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Erro ao enviar ticket.');
-      setSuccess(true);
+      const { fsSetDocument, initializeFirebaseClient, isFirebaseEnabled } = await import('../../firebase');
+      await initializeFirebaseClient();
+      
+      if (isFirebaseEnabled()) {
+        const ticketId = `ticket_${Date.now()}`;
+        await fsSetDocument('suporte', ticketId, {
+          ...form,
+          status: 'novo',
+          createdAt: new Date().toISOString()
+        });
+        setSuccess(true);
+      } else {
+        throw new Error('Serviço de suporte indisponível momentaneamente.');
+      }
     } catch (err: any) {
       setError(err.message);
     } finally {

@@ -1,174 +1,40 @@
-import { initializeApp, getApp, getApps } from 'firebase/app';
-import { 
-  getFirestore, 
-  collection, 
-  doc, 
-  getDocs, 
-  getDoc, 
-  setDoc, 
-  updateDoc, 
-  deleteDoc, 
-  query, 
-  where 
-} from 'firebase/firestore';
 
-export interface FirebaseConfig {
-  apiKey: string;
-  authDomain: string;
-  projectId: string;
-  storageBucket: string;
-  messagingSenderId: string;
-  appId: string;
-  measurementId?: string;
-  firestoreDatabaseId?: string;
-}
+import { db, seedInitialData } from './lib/localStorageDB';
 
-let firebaseEnabled = false;
-let dbInstance: any = null;
+// Force 100% Client-Side LocalStorage mode
+let firebaseEnabled = true;
 
-// Dynamically check and initialize Firebase client
 export async function initializeFirebaseClient(): Promise<boolean> {
-  try {
-    const response = await fetch('firebase-config.json');
-    if (!response.ok) {
-      console.log("Firebase config file not loaded yet. Working in Fallback/Local storage API mode.");
-      return false;
-    }
-    const config: FirebaseConfig = await response.json();
-    
-    // Check if any fields remain as placeholders
-    if (
-      !config.apiKey || 
-      config.apiKey.includes('SUA_API_KEY') || 
-      config.projectId.includes('SEU_PROJECT_ID')
-    ) {
-      console.log("Firebase client-side active mode: placeholders detected. Using local simulation.");
-      return false;
-    }
-
-    const app = getApps().length === 0 ? initializeApp(config) : getApp();
-    const dbId = config.firestoreDatabaseId || '(default)';
-    dbInstance = getFirestore(app, dbId);
-    firebaseEnabled = true;
-    console.log(`🔥 Firebase Initialized: Project=${config.projectId}, Database=${dbId}`);
-    return true;
-  } catch (error) {
-    console.warn("Client Firebase fallback trigger: ", error);
-    return false;
-  }
+  seedInitialData();
+  return true;
 }
 
 export function isFirebaseEnabled(): boolean {
-  return firebaseEnabled;
+  return true;
 }
 
-enum OperationType {
-  CREATE = 'create',
-  UPDATE = 'update',
-  DELETE = 'delete',
-  LIST = 'list',
-  GET = 'get',
-  WRITE = 'write',
+export async function fsGetDocument(collection: string, id: string): Promise<any> {
+  return db.getDocument(collection, id);
 }
 
-interface FirestoreErrorInfo {
-  error: string;
-  operationType: OperationType;
-  path: string | null;
-  authInfo: {
-    userId?: string | null;
-    email?: string | null;
-    emailVerified?: boolean | null;
-    isAnonymous?: boolean | null;
-  }
+export async function fsSetDocument(collection: string, id: string, data: any): Promise<boolean> {
+  await db.setDocument(collection, id, data);
+  return true;
 }
 
-function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
-  const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
-    authInfo: {
-      userId: null, // We'd need to import auth to get real info
-      email: null,
-      emailVerified: null,
-      isAnonymous: null,
-    },
-    operationType,
-    path
-  };
-  console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
+export async function fsDeleteDocument(collection: string, id: string): Promise<boolean> {
+  await db.deleteDocument(collection, id);
+  return true;
 }
 
-// ----------------------------------------------------
-// FIRESTORE GENERIC API WRAPPERS
-// ----------------------------------------------------
-
-export async function fsGetCollection(colName: string): Promise<any[]> {
-  if (!firebaseEnabled || !dbInstance) return [];
-  try {
-    const colRef = collection(dbInstance, colName);
-    const snap = await getDocs(colRef);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-  } catch (e) {
-    handleFirestoreError(e, OperationType.GET, colName);
-    return [];
-  }
+export async function fsGetCollection(collection: string): Promise<any[]> {
+  return db.getCollection(collection);
 }
 
-export async function fsGetDocument(colName: string, docId: string): Promise<any | null> {
-  if (!firebaseEnabled || !dbInstance) return null;
-  const fullPath = `${colName}/${docId}`;
-  try {
-    const docRef = doc(dbInstance, colName, docId);
-    const snap = await getDoc(docRef);
-    if (snap.exists()) {
-      return { id: snap.id, ...snap.data() };
-    }
-    return null;
-  } catch (e) {
-    handleFirestoreError(e, OperationType.GET, fullPath);
-    return null;
-  }
+export async function fsQueryCollection(collection: string, field: string, operator: any, value: any): Promise<any[]> {
+  return db.queryCollection(collection, field, operator, value);
 }
 
-export async function fsSetDocument(colName: string, docId: string, data: any): Promise<boolean> {
-  if (!firebaseEnabled || !dbInstance) return false;
-  try {
-    const docRef = doc(dbInstance, colName, docId);
-    await setDoc(docRef, data, { merge: true });
-    return true;
-  } catch (e) {
-    console.error(`Error setting document ${colName}/${docId}:`, e);
-    return false;
-  }
-}
-
-export async function fsDeleteDocument(colName: string, docId: string): Promise<boolean> {
-  if (!firebaseEnabled || !dbInstance) return false;
-  try {
-    const docRef = doc(dbInstance, colName, docId);
-    await deleteDoc(docRef);
-    return true;
-  } catch (e) {
-    console.error(`Error deleting document ${colName}/${docId}:`, e);
-    return false;
-  }
-}
-
-export async function fsQueryCollection(colName: string, field: string, operator: any, value: any): Promise<any[]> {
-  if (!firebaseEnabled || !dbInstance) return [];
-  try {
-    const colRef = collection(dbInstance, colName);
-    const q = query(colRef, where(field, operator, value));
-    const snap = await getDocs(q);
-    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-  } catch (e) {
-    console.error(`Error querying collection ${colName}:`, e);
-    return [];
-  }
-}
-
-export async function fsGetGlobalConfig(): Promise<any | null> {
-  // Try to get from 'config' collection, document 'main' to match blueprint
-  return fsGetDocument('config', 'main');
+export async function fsGetGlobalConfig(): Promise<any> {
+  return db.getDocument('config', 'main');
 }
