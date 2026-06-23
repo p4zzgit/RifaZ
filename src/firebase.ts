@@ -20,6 +20,7 @@ export interface FirebaseConfig {
   messagingSenderId: string;
   appId: string;
   measurementId?: string;
+  firestoreDatabaseId?: string;
 }
 
 let firebaseEnabled = false;
@@ -46,7 +47,7 @@ export async function initializeFirebaseClient(): Promise<boolean> {
     }
 
     const app = getApps().length === 0 ? initializeApp(config) : getApp();
-    dbInstance = getFirestore(app);
+    dbInstance = getFirestore(app, config.firestoreDatabaseId || '(default)');
     firebaseEnabled = true;
     console.log("🔥 Direct client-side Firebase (Firestore) Database initialized successfully!");
     return true;
