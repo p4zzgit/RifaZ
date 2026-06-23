@@ -66,7 +66,7 @@ export default function PublicBolaoView() {
 
   const fetchBolaoDetails = () => {
     setLoading(true);
-    fetch(`/api/boloes/view/${slug}`)
+    fetch(`api/boloes/view/${slug}`)
       .then(async res => {
         const data = await res.json();
         if (!res.ok) {

@@ -28,7 +28,7 @@ let dbInstance: any = null;
 // Dynamically check and initialize Firebase client
 export async function initializeFirebaseClient(): Promise<boolean> {
   try {
-    const response = await fetch('/firebase-config.json');
+    const response = await fetch('firebase-config.json');
     if (!response.ok) {
       console.log("Firebase config file not loaded yet. Working in Fallback/Local storage API mode.");
       return false;

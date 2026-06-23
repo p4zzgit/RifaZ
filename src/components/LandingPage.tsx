@@ -44,7 +44,7 @@ export default function LandingPage({ onLoginClick, user }: LandingPageProps) {
       setShowCreateModal(true);
     }
 
-    fetch('/api/config')
+    fetch('api/config')
       .then(async res => {
         if (!res.ok) throw new Error('API unavailable');
         const text = await res.text();

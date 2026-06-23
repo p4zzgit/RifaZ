@@ -48,7 +48,7 @@ export default function PublicRaffleView() {
   useEffect(() => {
     const load = async () => {
         try {
-            const res = await fetch(`/api/raffles/view/${slug}`);
+            const res = await fetch(`api/raffles/view/${slug}`);
             if (!res.ok) throw new Error('API unavailable');
             const data = await res.json();
             setRifa(data);

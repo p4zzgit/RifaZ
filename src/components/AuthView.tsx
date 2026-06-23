@@ -12,7 +12,7 @@ export default function AuthView({ onLoginSuccess }: AuthViewProps) {
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
 
   useEffect(() => {
-    fetch('/api/config')
+    fetch('api/config')
       .then(res => res.json())
       .then(data => {
         if (data && data.platformLogo) {
@@ -39,7 +39,7 @@ export default function AuthView({ onLoginSuccess }: AuthViewProps) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/auth/login', {
+      const res = await fetch('api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form)
@@ -79,7 +79,7 @@ export default function AuthView({ onLoginSuccess }: AuthViewProps) {
     e.preventDefault();
     setTicketSubmitting(true);
     try {
-      const res = await fetch('/api/support/ticket', {
+      const res = await fetch('api/support/ticket', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(ticketForm)
