@@ -66,10 +66,10 @@ export default function ClientDashboard() {
       
       // Load shared stats and profile info
       const [wRes, fRes, cRes, pRes] = await Promise.all([
-        fetch('/api/me/withdrawals', { headers }),
-        fetch('/api/me/finance', { headers }),
-        fetch('/api/config'),
-        fetch('/api/me/profile', { headers }).catch(() => null)
+        fetch('api/me/withdrawals', { headers }),
+        fetch('api/me/finance', { headers }),
+        fetch('api/config'),
+        fetch('api/me/profile', { headers }).catch(() => null)
       ]);
 
       setWithdrawals(await parseResponse(wRes));
@@ -89,7 +89,7 @@ export default function ClientDashboard() {
       }
 
       if (productMode === 'rifas') {
-        const rRes = await fetch('/api/me/raffles', { headers });
+        const rRes = await fetch('api/me/raffles', { headers });
         const rData = await parseResponse(rRes);
         setRifas(rData);
         
@@ -98,7 +98,7 @@ export default function ClientDashboard() {
           const found = rData.find((r: any) => r.id === activeRifa.id);
           if (found) {
             setActiveRifa(found);
-            const pRes = await fetch(`/api/me/raffles/${found.id}/participants`, { headers });
+            const pRes = await fetch(`api/me/raffles/${found.id}/participants`, { headers });
             setRaffleParticipants(await parseResponse(pRes));
           } else {
             setActiveRifa(null);
@@ -109,7 +109,7 @@ export default function ClientDashboard() {
           setRaffleParticipants([]);
         }
       } else {
-        const bRes = await fetch('/api/me/boloes', { headers });
+        const bRes = await fetch('api/me/boloes', { headers });
         const bData = await parseResponse(bRes);
         setBoloes(bData);
         if (bData.length > 0) {
@@ -183,7 +183,7 @@ export default function ClientDashboard() {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${localStorage.getItem('token')}` 
       };
-      const response = await fetch('/api/me/pix', {
+      const response = await fetch('api/me/pix', {
         method: 'POST',
         headers,
         body: JSON.stringify({ keys: editingPixKeys })
@@ -206,7 +206,7 @@ export default function ClientDashboard() {
   const handleSelectBolao = async (id: string) => {
     try {
       const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` };
-      const res = await fetch(`/api/me/boloes/${id}`, { headers });
+      const res = await fetch(`api/me/boloes/${id}`, { headers });
       const data = await parseResponse(res);
       if (data && data.bolao) {
         setActiveBolao(data.bolao);
@@ -222,7 +222,7 @@ export default function ClientDashboard() {
     setActiveRifa(rifa);
     try {
       const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` };
-      const pRes = await fetch(`/api/me/raffles/${rifa.id}/participants`, { headers });
+      const pRes = await fetch(`api/me/raffles/${rifa.id}/participants`, { headers });
       setRaffleParticipants(await parseResponse(pRes));
     } catch (err) {
       console.error(err);
@@ -260,7 +260,7 @@ export default function ClientDashboard() {
       if (productMode === 'rifas') payload.raffleId = pid;
       else payload.bolaoId = pid;
 
-      const res = await fetch('/api/withdrawals', {
+      const res = await fetch('api/withdrawals', {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -289,7 +289,7 @@ export default function ClientDashboard() {
     if (!activeRifa) return;
     setSaving(true);
     try {
-      const res = await fetch(`/api/raffles/${activeRifa.id}`, {
+      const res = await fetch(`api/raffles/${activeRifa.id}`, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
@@ -310,7 +310,7 @@ export default function ClientDashboard() {
     if (!activeBolao) return;
     setSaving(true);
     try {
-      const res = await fetch(`/api/me/boloes/${activeBolao.id}`, {
+      const res = await fetch(`api/me/boloes/${activeBolao.id}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -336,7 +336,7 @@ export default function ClientDashboard() {
     const formData = new FormData();
     formData.append('image', file);
     try {
-      const res = await fetch('/api/upload', {
+      const res = await fetch('api/upload', {
         method: 'POST',
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
         body: formData
@@ -358,7 +358,7 @@ export default function ClientDashboard() {
     if (!activeBolao || !matchForm.teamA || !matchForm.teamB) return;
     setSaving(true);
     try {
-      const res = await fetch(`/api/me/boloes/${activeBolao.id}/matches`, {
+      const res = await fetch(`api/me/boloes/${activeBolao.id}/matches`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -381,7 +381,7 @@ export default function ClientDashboard() {
   const handleUpdateMatchScore = async (matchId: string, payload: any) => {
     if (!activeBolao) return;
     try {
-      const res = await fetch(`/api/me/boloes/${activeBolao.id}/matches/${matchId}`, {
+      const res = await fetch(`api/me/boloes/${activeBolao.id}/matches/${matchId}`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -400,7 +400,7 @@ export default function ClientDashboard() {
   const handleDeleteMatch = async (matchId: string) => {
     if (!activeBolao || !confirm('Tem certeza de que deseja excluir esta partida do bolão?')) return;
     try {
-      const res = await fetch(`/api/me/boloes/${activeBolao.id}/matches/${matchId}`, {
+      const res = await fetch(`api/me/boloes/${activeBolao.id}/matches/${matchId}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });

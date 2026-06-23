@@ -132,7 +132,7 @@ export const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({ config, on
         if (token) {
           headers['Authorization'] = `Bearer ${token}`;
         }
-        const res = await fetch('/api/upload', {
+        const res = await fetch('api/upload', {
           method: 'POST',
           headers,
           body: formData
@@ -181,7 +181,7 @@ export const CreateRaffleModal: React.FC<CreateRaffleModalProps> = ({ config, on
         slots: form.slots === 'custom' ? form.customSlots : form.slots,
         email: `${form.usuario}@placeholder.com` // Ensure backend compatibility
       };
-      const res = await fetch('/api/raffles', {
+      const res = await fetch('api/raffles', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)

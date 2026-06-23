@@ -3,11 +3,19 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>My Google AI Studio App</title>
+    <title>RifaZ</title>
   </head>
   <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <div id="root">
+      <div style="height: 100vh; display: flex; align-items: center; justify-content: center; font-family: sans-serif; text-align: center; color: #666;">
+        <div>
+          <h2 style="color: #FF8C00;">Carregando Plataforma...</h2>
+          <p>Se esta mensagem persistir, verifique se o processo de <b>Build</b> no GitHub Actions foi concluído.</p>
+          <p style="font-size: 12px;">GitHub Pages requer que o código React (.tsx) seja compilado para JavaScript.</p>
+        </div>
+      </div>
+    </div>
+    <script type="module" src="src/main.tsx"></script>
   </body>
 </html>
 

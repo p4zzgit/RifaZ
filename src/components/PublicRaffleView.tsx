@@ -30,7 +30,7 @@ export default function PublicRaffleView() {
   });
 
   const fetchRaffle = () => {
-    fetch(`/api/raffles/view/${slug}`)
+    fetch(`api/raffles/view/${slug}`)
       .then(async res => {
         if (!res.ok) throw new Error('Rifa não encontrada');
         return res.json();
@@ -38,7 +38,7 @@ export default function PublicRaffleView() {
       .then(data => {
         setRifa(data);
         // Fetch booked numbers
-        return fetch(`/api/admin/raffles`); // We need a public endpoint for participants though
+        return fetch(`api/admin/raffles`); // We need a public endpoint for participants though
       })
       .catch(err => {
         console.error('Rifa view error:', err);
@@ -89,7 +89,7 @@ export default function PublicRaffleView() {
 
     const interval = setInterval(async () => {
       try {
-        const res = await fetch(`/api/purchases/${pendingPurchase.id}`);
+        const res = await fetch(`api/purchases/${pendingPurchase.id}`);
         if (res.ok) {
           const data = await res.json();
           if (data.status === 'pago') {
@@ -139,7 +139,7 @@ export default function PublicRaffleView() {
   const handlePurchase = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      const res = await fetch(`/api/raffles/${slug}/purchase`, {
+      const res = await fetch(`api/raffles/${slug}/purchase`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

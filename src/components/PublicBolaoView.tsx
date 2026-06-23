@@ -126,7 +126,7 @@ export default function PublicBolaoView() {
       }));
 
     try {
-      const res = await fetch(`/api/boloes/${slug}/join`, {
+      const res = await fetch(`api/boloes/${slug}/join`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...joinForm, guesses: guessList })
@@ -148,7 +148,7 @@ export default function PublicBolaoView() {
     setAuthError(null);
     setAuthLoading(true);
     try {
-      const res = await fetch(`/api/boloes/${slug}/participant-login`, {
+      const res = await fetch(`api/boloes/${slug}/participant-login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(authForm)
@@ -202,7 +202,7 @@ export default function PublicBolaoView() {
       }));
 
     try {
-      const res = await fetch(`/api/boloes/participant/${activeParticipant.id}/guesses`, {
+      const res = await fetch(`api/boloes/participant/${activeParticipant.id}/guesses`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ guesses: guessList })

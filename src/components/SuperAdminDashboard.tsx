@@ -96,16 +96,16 @@ export default function SuperAdminDashboard() {
     try {
       const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` };
       const [cRes, sRes, rRes, uRes, fRes, bRes, lRes, tuRes, trRes, tbRes] = await Promise.all([
-        fetch('/api/config'),
-        fetch('/api/admin/withdrawals', { headers }),
-        fetch('/api/admin/raffles', { headers }),
-        fetch('/api/admin/users', { headers }),
-        fetch('/api/admin/finance', { headers }),
-        fetch('/api/admin/boloes', { headers }),
-        fetch('/api/admin/logs', { headers }),
-        fetch('/api/admin/trash/users', { headers }),
-        fetch('/api/admin/trash/raffles', { headers }),
-        fetch('/api/admin/trash/boloes', { headers })
+        fetch('api/config'),
+        fetch('api/admin/withdrawals', { headers }),
+        fetch('api/admin/raffles', { headers }),
+        fetch('api/admin/users', { headers }),
+        fetch('api/admin/finance', { headers }),
+        fetch('api/admin/boloes', { headers }),
+        fetch('api/admin/logs', { headers }),
+        fetch('api/admin/trash/users', { headers }),
+        fetch('api/admin/trash/raffles', { headers }),
+        fetch('api/admin/trash/boloes', { headers })
       ]);
 
       const parseJson = async (res: Response) => {
@@ -142,7 +142,7 @@ export default function SuperAdminDashboard() {
   }
 
   const handleUpdateUserFee = async (userId: string, fee: number) => {
-    await fetch(`/api/admin/users/${userId}/fee`, {
+    await fetch(`api/admin/users/${userId}/fee`, {
       method: 'PUT',
       headers: { 
         'Content-Type': 'application/json',
@@ -155,7 +155,7 @@ export default function SuperAdminDashboard() {
 
   const handleUpdateConfig = async () => {
     setSaving(true);
-    await fetch('/api/config', {
+    await fetch('api/config', {
       method: 'PUT',
       headers: { 
         'Content-Type': 'application/json',
@@ -167,7 +167,7 @@ export default function SuperAdminDashboard() {
   };
 
   const handleUpdateWithdrawal = async (id: string, status: string) => {
-    await fetch(`/api/admin/withdrawals/${id}`, {
+    await fetch(`api/admin/withdrawals/${id}`, {
       method: 'PUT',
       headers: { 
         'Content-Type': 'application/json',
@@ -180,7 +180,7 @@ export default function SuperAdminDashboard() {
 
   const handleUpdateUserStatus = async (userId: string, newStatus: 'ativo' | 'suspenso' | 'banido') => {
     try {
-      const res = await fetch(`/api/admin/users/${userId}`, {
+      const res = await fetch(`api/admin/users/${userId}`, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
@@ -211,7 +211,7 @@ export default function SuperAdminDashboard() {
 
   const handleUpdateRaffleStatus = async (id: string, status: 'ativa' | 'suspensa') => {
     try {
-      const res = await fetch(`/api/admin/raffles/${id}/status`, {
+      const res = await fetch(`api/admin/raffles/${id}/status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -242,7 +242,7 @@ export default function SuperAdminDashboard() {
 
   const handleUpdateBolaoStatus = async (id: string, status: 'ativo' | 'suspenso') => {
     try {
-      const res = await fetch(`/api/admin/boloes/${id}/status`, {
+      const res = await fetch(`api/admin/boloes/${id}/status`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -287,10 +287,10 @@ export default function SuperAdminDashboard() {
     
     try {
       let url = '';
-      if (type === 'USER') url = `/api/admin/users/${id}`;
-      else if (type === 'RAFFLE') url = `/api/admin/raffles/${id}`;
-      else if (type === 'BOLAO') url = `/api/admin/boloes/${id}`;
-      else if (type === 'WITHDRAWAL') url = `/api/admin/withdrawals/${id}`;
+      if (type === 'USER') url = `api/admin/users/${id}`;
+      else if (type === 'RAFFLE') url = `api/admin/raffles/${id}`;
+      else if (type === 'BOLAO') url = `api/admin/boloes/${id}`;
+      else if (type === 'WITHDRAWAL') url = `api/admin/withdrawals/${id}`;
 
       const res = await fetch(url, {
         method: 'DELETE',
@@ -316,7 +316,7 @@ export default function SuperAdminDashboard() {
   const handleRestore = async (type: 'usuarios' | 'rifas' | 'boloes', id: string) => {
     if (!confirm('Deseja realmente restaurar este registro?')) return;
     try {
-      const res = await fetch(`/api/admin/restore/${type}/${id}`, {
+      const res = await fetch(`api/admin/restore/${type}/${id}`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
       });
@@ -340,7 +340,7 @@ export default function SuperAdminDashboard() {
     }
 
     try {
-      const res = await fetch(`/api/admin/withdrawals/${rejectionModal.withdrawalId}`, {
+      const res = await fetch(`api/admin/withdrawals/${rejectionModal.withdrawalId}`, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
@@ -365,7 +365,7 @@ export default function SuperAdminDashboard() {
     if (!editingUser) return;
     setSaving(true);
     try {
-      const res = await fetch(`/api/admin/users/${editingUser.id}`, {
+      const res = await fetch(`api/admin/users/${editingUser.id}`, {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
@@ -415,7 +415,7 @@ export default function SuperAdminDashboard() {
     e.preventDefault();
     setSaving(true);
     try {
-      const res = await fetch('/api/admin/profile', {
+      const res = await fetch('api/admin/profile', {
         method: 'PUT',
         headers: { 
           'Content-Type': 'application/json',
@@ -448,7 +448,7 @@ export default function SuperAdminDashboard() {
     formData.append('image', file);
     
     try {
-      const res = await fetch('/api/upload', {
+      const res = await fetch('api/upload', {
         method: 'POST',
         headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
         body: formData

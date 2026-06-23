@@ -76,7 +76,7 @@ export const CreateBolaoModal: React.FC<CreateBolaoModalProps> = ({ config, onCl
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
       }
-      const res = await fetch('/api/upload', {
+      const res = await fetch('api/upload', {
         method: 'POST',
         headers,
         body: formData
@@ -134,7 +134,7 @@ export const CreateBolaoModal: React.FC<CreateBolaoModalProps> = ({ config, onCl
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch('/api/boloes', {
+      const res = await fetch('api/boloes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form)

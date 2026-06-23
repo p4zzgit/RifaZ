@@ -58,7 +58,7 @@ export const SupportTicketModal: React.FC<SupportTicketModalProps> = ({ onClose 
     setError(null);
 
     try {
-      const res = await fetch('/api/support/ticket', {
+      const res = await fetch('api/support/ticket', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form)
