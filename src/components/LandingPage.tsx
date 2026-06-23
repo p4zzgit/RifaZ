@@ -72,6 +72,15 @@ export default function LandingPage({ onLoginClick, user }: LandingPageProps) {
           secondaryColor: '#FF8C00',
           contactEmail: 'suporte@rifadigital.com',
           contactWhatsApp: '',
+          heroTitle: 'Crie sua Rifa Digital em minutos',
+          heroSub: 'A plataforma mais completa para gerenciar seus sorteios online.',
+          featuresTitle: 'Por que escolher nossa plataforma?',
+          featuresLabel: 'Benefícios',
+          features: [
+            { title: 'Rápido e Fácil', desc: 'Crie sua rifa em menos de 2 minutos.', icon: 'Bike' },
+            { title: 'Pagamento Seguro', desc: 'Integração direta com Mercado Pago.', icon: 'ShieldCheck' },
+            { title: 'Gestão Completa', desc: 'Painel administrativo para controle total.', icon: 'Settings' }
+          ],
           faqs: [],
           testimonials: [],
           footerText: '© 2026 Rifa Digital. Todos os direitos reservados.'

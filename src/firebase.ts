@@ -129,6 +129,6 @@ export async function fsQueryCollection(colName: string, field: string, operator
 }
 
 export async function fsGetGlobalConfig(): Promise<any | null> {
-  // Try to get from 'config' collection, document 'global'
-  return fsGetDocument('config', 'global');
+  // Try to get from 'config' collection, document 'main' to match blueprint
+  return fsGetDocument('config', 'main');
 }

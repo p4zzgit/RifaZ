@@ -1,0 +1,49 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Reusable helpers
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Default deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Platform Config - Publicly readable, admin writable
+    match /config/main {
+      allow read: if true;
+      allow write: if isSignedIn(); // We should tighten this late to only super_admin
+    }
+
+    // Users
+    match /usuarios/{userId} {
+      allow read, write: if isOwner(userId);
+    }
+
+    // Raffles
+    match /rifas/{rifaId} {
+      allow read: if true;
+      allow create: if isSignedIn();
+      allow update, delete: if isSignedIn() && (resource.data.ownerId == request.auth.uid);
+      
+      // Participants
+      match /participantes/{pId} {
+        allow read: if true; // Public can see slots or admin
+        allow create: if true; // Public can join
+        allow update: if isSignedIn(); // For status updates by admin
+      }
+    }
+
+    // Withdrawals
+    match /withdrawals/{wId} {
+      allow read, create: if isSignedIn();
+      allow update: if isSignedIn();
+    }
+  }
+}
