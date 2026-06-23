@@ -53,15 +53,19 @@ export default function LandingPage({ onLoginClick, user }: LandingPageProps) {
       .then(data => {
         if (data) setConfig(data);
       })
-      .catch(async () => {
-        console.log('API config unavailable, falling back to Firebase/Local');
-        const { fsGetGlobalConfig, isFirebaseEnabled } = await import('../firebase');
-        if (isFirebaseEnabled()) {
-          const fbConfig = await fsGetGlobalConfig();
-          if (fbConfig) {
-            setConfig(fbConfig);
-            return;
+      .catch(async (err) => {
+        console.log('Primary config fetch failed, trying Firebase/Fallback:', err);
+        try {
+          const { fsGetGlobalConfig, isFirebaseEnabled } = await import('../firebase');
+          if (isFirebaseEnabled()) {
+            const fbConfig = await fsGetGlobalConfig();
+            if (fbConfig) {
+              setConfig(fbConfig);
+              return;
+            }
           }
+        } catch (fbErr) {
+          console.warn('Firebase config fetch failed:', fbErr);
         }
         
         // Final fallback to some hardcoded values if everything fails

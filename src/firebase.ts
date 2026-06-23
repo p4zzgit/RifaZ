@@ -61,8 +61,45 @@ export function isFirebaseEnabled(): boolean {
   return firebaseEnabled;
 }
 
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+    emailVerified?: boolean | null;
+    isAnonymous?: boolean | null;
+  }
+}
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: null, // We'd need to import auth to get real info
+      email: null,
+      emailVerified: null,
+      isAnonymous: null,
+    },
+    operationType,
+    path
+  };
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
+
 // ----------------------------------------------------
-// FIRESTORE GENERIC API WRAPPERS FOR STATIC GH-PAGES
+// FIRESTORE GENERIC API WRAPPERS
 // ----------------------------------------------------
 
 export async function fsGetCollection(colName: string): Promise<any[]> {
@@ -72,13 +109,14 @@ export async function fsGetCollection(colName: string): Promise<any[]> {
     const snap = await getDocs(colRef);
     return snap.docs.map(d => ({ id: d.id, ...d.data() }));
   } catch (e) {
-    console.error(`Error fetching collection ${colName}:`, e);
+    handleFirestoreError(e, OperationType.GET, colName);
     return [];
   }
 }
 
 export async function fsGetDocument(colName: string, docId: string): Promise<any | null> {
   if (!firebaseEnabled || !dbInstance) return null;
+  const fullPath = `${colName}/${docId}`;
   try {
     const docRef = doc(dbInstance, colName, docId);
     const snap = await getDoc(docRef);
@@ -87,7 +125,7 @@ export async function fsGetDocument(colName: string, docId: string): Promise<any
     }
     return null;
   } catch (e) {
-    console.error(`Error fetching document ${colName}/${docId}:`, e);
+    handleFirestoreError(e, OperationType.GET, fullPath);
     return null;
   }
 }
