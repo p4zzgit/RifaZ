@@ -94,39 +94,51 @@ export default function SuperAdminDashboard() {
   async function loadDashboard() {
     setLoading(true);
     try {
-      const headers = { Authorization: `Bearer ${localStorage.getItem('token')}` };
-      const [cRes, sRes, rRes, uRes, fRes, bRes, lRes, tuRes, trRes, tbRes] = await Promise.all([
-        fetch('api/config'),
-        fetch('api/admin/withdrawals', { headers }),
-        fetch('api/admin/raffles', { headers }),
-        fetch('api/admin/users', { headers }),
-        fetch('api/admin/finance', { headers }),
-        fetch('api/admin/boloes', { headers }),
-        fetch('api/admin/logs', { headers }),
-        fetch('api/admin/trash/users', { headers }),
-        fetch('api/admin/trash/raffles', { headers }),
-        fetch('api/admin/trash/boloes', { headers })
+      const { 
+        fsGetGlobalConfig, 
+        fsGetCollection, 
+        initializeFirebaseClient,
+        isFirebaseEnabled 
+      } = await import('../firebase');
+      
+      await initializeFirebaseClient();
+      if (!isFirebaseEnabled()) {
+        console.warn('Firebase not enabled for dashboard');
+        setLoading(false);
+        return;
+      }
+
+      const [cData, sData, rData, uData, bData, lData, tuData, trData, tbData] = await Promise.all([
+        fsGetGlobalConfig(),
+        fsGetCollection('withdrawals'),
+        fsGetCollection('rifas'),
+        fsGetCollection('usuarios'),
+        fsGetCollection('boloes'),
+        fsGetCollection('logs'),
+        fsGetCollection('trash_users'),
+        fsGetCollection('trash_rifas'),
+        fsGetCollection('trash_boloes')
       ]);
 
-      const parseJson = async (res: Response) => {
-        if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-        const text = await res.text();
-        return text ? JSON.parse(text) : [];
-      };
+      setConfig(cData);
+      setSaques(sData);
+      setRifas(rData);
+      setUsers(uData);
+      setBoloes(bData);
+      setAdminLogs(lData);
+      setDeletedUsers(tuData);
+      setDeletedRifas(trData);
+      setDeletedBoloes(tbData);
 
-      setConfig(await parseJson(cRes));
-      setSaques(await parseJson(sRes));
-      setRifas(await parseJson(rRes));
-      const userData = await parseJson(uRes);
-      setUsers(userData);
-      setFinance(await parseJson(fRes));
-      setBoloes(await parseJson(bRes));
-      setAdminLogs(await parseJson(lRes));
-      setDeletedUsers(await parseJson(tuRes));
-      setDeletedRifas(await parseJson(trRes));
-      setDeletedBoloes(await parseJson(tbRes));
+      // Simple finance aggregation for static mode
+      const totalBalance = uData.reduce((acc: number, u: any) => acc + (u.saldo || 0), 0);
+      setFinance({
+        totalBalance,
+        totalWithdrawn: sData.filter((s: any) => s.status === 'aprovado').reduce((acc: number, s: any) => acc + (s.valor || 0), 0),
+        activeRaffles: rData.filter((r: any) => r.status === 'ativo').length
+      });
 
-      const me = userData.find((u: any) => u.id === 'super-admin-id');
+      const me = uData.find((u: any) => u.role === 'super_admin');
       if (me) {
         setProfileForm({
           nome: me.nome,
@@ -135,67 +147,52 @@ export default function SuperAdminDashboard() {
         });
       }
     } catch (e) {
-      console.error('Failed to load dashboard:', e);
+      console.error('Failed to load dashboard from Firebase:', e);
     } finally {
       setLoading(false);
     }
   }
 
   const handleUpdateUserFee = async (userId: string, fee: number) => {
-    await fetch(`api/admin/users/${userId}/fee`, {
-      method: 'PUT',
-      headers: { 
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${localStorage.getItem('token')}` 
-      },
-      body: JSON.stringify({ fee })
-    });
-    loadDashboard();
+    const { fsSetDocument, isFirebaseEnabled } = await import('../firebase');
+    if (isFirebaseEnabled()) {
+      await fsSetDocument('usuarios', userId, { fee });
+      loadDashboard();
+    }
   };
 
   const handleUpdateConfig = async () => {
+    if (!config) return;
     setSaving(true);
-    await fetch('api/config', {
-      method: 'PUT',
-      headers: { 
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${localStorage.getItem('token')}` 
-      },
-      body: JSON.stringify(config)
-    });
-    setSaving(false);
+    try {
+      const { fsSetDocument, isFirebaseEnabled } = await import('../firebase');
+      if (isFirebaseEnabled()) {
+        await fsSetDocument('config', 'main', config);
+      }
+    } catch (e) {
+      console.error('Save failed:', e);
+    } finally {
+      setSaving(false);
+    }
   };
 
   const handleUpdateWithdrawal = async (id: string, status: string) => {
-    await fetch(`api/admin/withdrawals/${id}`, {
-      method: 'PUT',
-      headers: { 
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${localStorage.getItem('token')}` 
-      },
-      body: JSON.stringify({ status })
-    });
-    loadDashboard();
+    const { fsSetDocument, isFirebaseEnabled } = await import('../firebase');
+    if (isFirebaseEnabled()) {
+      await fsSetDocument('withdrawals', id, { status });
+      loadDashboard();
+    }
   };
 
   const handleUpdateUserStatus = async (userId: string, newStatus: 'ativo' | 'suspenso' | 'banido') => {
     try {
-      const res = await fetch(`api/admin/users/${userId}`, {
-        method: 'PUT',
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('token')}` 
-        },
-        body: JSON.stringify({ status: newStatus })
-      });
-      if (res.ok) {
+      const { fsSetDocument, isFirebaseEnabled } = await import('../firebase');
+      if (isFirebaseEnabled()) {
+        await fsSetDocument('usuarios', userId, { status: newStatus });
         loadDashboard();
-      } else {
-        const data = await res.json();
-        alert(data.error || 'Erro ao atualizar status');
       }
     } catch (e) {
-      alert('Erro de conexão');
+      alert('Erro ao atualizar status');
     }
   };
 

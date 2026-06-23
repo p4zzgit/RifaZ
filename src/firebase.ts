@@ -47,9 +47,10 @@ export async function initializeFirebaseClient(): Promise<boolean> {
     }
 
     const app = getApps().length === 0 ? initializeApp(config) : getApp();
-    dbInstance = getFirestore(app, config.firestoreDatabaseId || '(default)');
+    const dbId = config.firestoreDatabaseId || '(default)';
+    dbInstance = getFirestore(app, dbId);
     firebaseEnabled = true;
-    console.log("🔥 Direct client-side Firebase (Firestore) Database initialized successfully!");
+    console.log(`🔥 Firebase Initialized: Project=${config.projectId}, Database=${dbId}`);
     return true;
   } catch (error) {
     console.warn("Client Firebase fallback trigger: ", error);
