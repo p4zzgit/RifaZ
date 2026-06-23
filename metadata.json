@@ -1,0 +1,8 @@
+{
+  "name": "Rifa Online + Bolão",
+  "description": "Sistema completo para Chá Rifa Online com escolha de dias de calendário, integração Mercado Pago PIX, webhook e painel administrativo.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
