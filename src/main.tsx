@@ -1,8 +1,8 @@
 import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
-import App from './App.tsx';
+import App from './App';
 import './index.css';
-import { initializeFirebaseClient } from './firebase.ts';
+import { initializeFirebaseClient } from './firebase';
 
 // Initialize Firebase before rendering
 initializeFirebaseClient().then(() => {
